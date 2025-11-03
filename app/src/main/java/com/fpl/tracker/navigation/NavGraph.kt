@@ -1,0 +1,69 @@
+package com.fpl.tracker.navigation
+
+import androidx.compose.runtime.Composable
+import androidx.navigation.NavHostController
+import androidx.navigation.NavType
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.navArgument
+import com.fpl.tracker.ui.screens.EnhancedInitialScreen
+import com.fpl.tracker.ui.screens.EnhancedLeagueStandingsScreen
+import com.fpl.tracker.ui.screens.ManagerFormationScreen
+import com.fpl.tracker.ui.screens.ManagerStatsScreen
+
+sealed class Screen(val route: String) {
+    object Initial : Screen("initial")
+    object ManagerStats : Screen("manager_stats/{managerId}") {
+        fun createRoute(managerId: Long) = "manager_stats/$managerId"
+    }
+    object LeagueStandings : Screen("league_standings/{leagueId}") {
+        fun createRoute(leagueId: Long) = "league_standings/$leagueId"
+    }
+    object ManagerFormation : Screen("manager_formation/{managerId}/{eventId}") {
+        fun createRoute(managerId: Long, eventId: Int) = "manager_formation/$managerId/$eventId"
+    }
+}
+
+@Composable
+fun NavGraph(
+    navController: NavHostController,
+    startDestination: String
+) {
+    NavHost(
+        navController = navController,
+        startDestination = startDestination
+    ) {
+        composable(Screen.Initial.route) {
+            EnhancedInitialScreen(navController)
+        }
+        
+        composable(
+            route = Screen.ManagerStats.route,
+            arguments = listOf(navArgument("managerId") { type = NavType.LongType })
+        ) { backStackEntry ->
+            val managerId = backStackEntry.arguments?.getLong("managerId") ?: 0L
+            ManagerStatsScreen(navController, managerId)
+        }
+        
+        composable(
+            route = Screen.LeagueStandings.route,
+            arguments = listOf(navArgument("leagueId") { type = NavType.LongType })
+        ) { backStackEntry ->
+            val leagueId = backStackEntry.arguments?.getLong("leagueId") ?: 0L
+            EnhancedLeagueStandingsScreen(navController, leagueId)
+        }
+        
+        composable(
+            route = Screen.ManagerFormation.route,
+            arguments = listOf(
+                navArgument("managerId") { type = NavType.LongType },
+                navArgument("eventId") { type = NavType.IntType }
+            )
+        ) { backStackEntry ->
+            val managerId = backStackEntry.arguments?.getLong("managerId") ?: 0L
+            val eventId = backStackEntry.arguments?.getInt("eventId") ?: 1
+            ManagerFormationScreen(navController, managerId, eventId)
+        }
+    }
+}
+
