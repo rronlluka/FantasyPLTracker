@@ -452,7 +452,7 @@ fun PlayerCardOnPitch(
                         }
                     }
                     
-                    // Opponent team
+                    // Opponent team (always show when available)
                     playerDetail.opponentTeam?.let { opponent ->
                         val isHome = playerDetail.fixture?.teamH == playerDetail.team.id
                         Text(
@@ -460,7 +460,8 @@ fun PlayerCardOnPitch(
                             fontSize = 7.sp,
                             color = Color.Gray,
                             maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
+                            overflow = TextOverflow.Ellipsis,
+                            textAlign = TextAlign.Center
                         )
                     }
                 }

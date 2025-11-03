@@ -408,6 +408,7 @@ fun ManagerFormationScreen(
                     leagueStats = leagueStats,
                     bootstrapData = uiState.bootstrapData,
                     currentEvent = eventId,
+                    liveStats = selectedPlayer!!.liveStats,
                     onDismiss = {
                         showPlayerDialog = false
                         selectedPlayer = null

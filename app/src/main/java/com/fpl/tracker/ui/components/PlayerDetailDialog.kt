@@ -28,6 +28,7 @@ fun PlayerDetailDialog(
     leagueStats: LeaguePlayerStats?,
     bootstrapData: BootstrapData?,
     currentEvent: Int,
+    liveStats: LiveElement? = null,
     onDismiss: () -> Unit
 ) {
     var selectedTabIndex by remember { mutableIntStateOf(0) }
@@ -125,7 +126,7 @@ fun PlayerDetailDialog(
                 // Content based on selected tab
                 Box(modifier = Modifier.weight(1f)) {
                     when (selectedTabIndex) {
-                        0 -> SummaryTab(player, team, playerDetail, leagueStats, bootstrapData, currentEvent)
+                        0 -> SummaryTab(player, team, playerDetail, leagueStats, bootstrapData, currentEvent, liveStats)
                         1 -> StartsTab(leagueStats)
                         2 -> BenchTab(leagueStats)
                     }
@@ -155,7 +156,8 @@ fun SummaryTab(
     playerDetail: PlayerDetailResponse?,
     leagueStats: LeaguePlayerStats?,
     bootstrapData: BootstrapData?,
-    currentEvent: Int
+    currentEvent: Int,
+    liveStats: LiveElement? = null
 ) {
     LazyColumn(
         modifier = Modifier
@@ -163,6 +165,74 @@ fun SummaryTab(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
+        // Debug: Log all explain identifiers to find defensive contributions
+        item {
+            liveStats?.explain?.let { explains ->
+                android.util.Log.d("PlayerDialog", "=== EXPLAIN STATS FOR ${player.webName} ===")
+                explains.forEach { explain ->
+                    android.util.Log.d("PlayerDialog", "Fixture ${explain.fixture}:")
+                    explain.stats.forEach { stat ->
+                        android.util.Log.d("PlayerDialog", "  - identifier: ${stat.identifier}, value: ${stat.value}, points: ${stat.points}")
+                    }
+                }
+            }
+        }
+        
+        // Defensive Contributions (if available in live stats)
+        item {
+            liveStats?.explain?.let { explains ->
+                explains.forEach { explain ->
+                    explain.stats.forEach { stat ->
+                        // Try multiple possible identifiers for defensive contributions
+                        if (stat.identifier.contains("def", ignoreCase = true) || 
+                            stat.identifier == "defensive_contributions" ||
+                            stat.identifier == "defensive" ||
+                            stat.identifier == "def_contributions") {
+                            Card(
+                                colors = CardDefaults.cardColors(
+                                    containerColor = Color(0xFFE8F5E9)
+                                )
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(16.dp)
+                                ) {
+                                    Text(
+                                        "Defensive Contributions",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 16.sp,
+                                        color = Color.Black
+                                    )
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    
+                                    val threshold = if (player.elementType == 2) 10 else 12
+                                    val positionName = when(player.elementType) {
+                                        2 -> "Defender"
+                                        3 -> "Midfielder"
+                                        4 -> "Forward"
+                                        else -> "Player"
+                                    }
+                                    
+                                    Text(
+                                        "$positionName: ${stat.value} defensive actions",
+                                        fontSize = 12.sp,
+                                        color = Color.Black
+                                    )
+                                    Text(
+                                        "Threshold: $threshold actions for +2 pts",
+                                        fontSize = 11.sp,
+                                        color = Color.Gray
+                                    )
+                                    
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    PointRow("Defensive bonus:", "+${stat.points}", true)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
         // Latest Match Summary
         item {
             playerDetail?.history?.lastOrNull()?.let { latestMatch ->
@@ -201,6 +271,24 @@ fun SummaryTab(
                         }
                         if (latestMatch.assists > 0) {
                             PointRow("${latestMatch.assists} assists:", "${latestMatch.assists * 3}")
+                        }
+                        if (latestMatch.cleanSheets > 0) {
+                            val cleanSheetPoints = when(player.elementType) {
+                                1 -> 4 // GK
+                                2 -> 4 // DEF
+                                3 -> 1 // MID
+                                else -> 0 // FWD
+                            }
+                            PointRow("Clean sheet:", "$cleanSheetPoints")
+                        }
+                        if (latestMatch.goalsConceded > 0) {
+                            val gcPoints = when(player.elementType) {
+                                1, 2 -> if (latestMatch.goalsConceded >= 2) -latestMatch.goalsConceded / 2 else 0 // GK/DEF
+                                else -> 0
+                            }
+                            if (gcPoints < 0) {
+                                PointRow("Goals conceded (${latestMatch.goalsConceded}):", "$gcPoints")
+                            }
                         }
                         PointRow("Played ${latestMatch.minutes} min:", if (latestMatch.minutes >= 60) "2" else "1")
                         PointRow("Bonus (${latestMatch.bps} bps):", "${latestMatch.bonus}")
