@@ -90,37 +90,16 @@ class ManagerFormationViewModel : ViewModel() {
                         bootstrap.teams.find { it.id == opponentTeamId } 
                     }
                     
-                    // Determine if player is live or has played
+                    // Determine game state
                     val isTrulyLive = fixture?.started == true && 
                         fixture.finished == false && 
                         fixture.finishedProvisional == false
                     
-                    // Check if just finished (within 3 hours)
-                    val isJustFinished = if (fixture != null && (fixture.finished == true || fixture.finishedProvisional == true)) {
-                        try {
-                            val kickoffTime = fixture.kickoffTime?.let { 
-                                java.time.Instant.parse(it) 
-                            }
-                            if (kickoffTime != null) {
-                                val now = java.time.Instant.now()
-                                val gameEndTime = kickoffTime.plusSeconds(90 * 60 + 45 * 60) // ~135 mins for full game
-                                val hoursSinceEnd = java.time.Duration.between(gameEndTime, now).toHours()
-                                hoursSinceEnd < 3
-                            } else {
-                                false
-                            }
-                        } catch (e: Exception) {
-                            false
-                        }
-                    } else {
-                        false
-                    }
-                    
                     // isLive = visual indicator (only truly live games)
-                    // hasLivePoints = should count points from live API (truly live OR just finished within 3 hours)
+                    // hasLivePoints = should count points from live API (started but not finished by FPL)
                     val isLive = isTrulyLive
-                    val hasLivePoints = isTrulyLive || isJustFinished
-                    val hasPlayed = fixture?.finished == true && !isJustFinished
+                    val hasLivePoints = fixture?.started == true && fixture.finished == false
+                    val hasPlayed = fixture?.finished == true
                     
                     PlayerWithDetails(
                         pick = pick,
@@ -135,37 +114,18 @@ class ManagerFormationViewModel : ViewModel() {
                     )
                 }
                 
-                // Calculate provisional bonus for fixtures needing it (live OR just finished)
+                // Calculate provisional bonus for fixtures with live data
                 val provisionalBonus = mutableMapOf<Int, Int>()
                 if (live != null) {
                     val liveFixtures = fixtures.filter { 
                         it.started == true && it.finished == false && it.finishedProvisional == false
                     }
                     
-                    // Just finished fixtures (within 3 hours)
-                    val justFinishedFixtures = fixtures.filter { fixture ->
-                        if (fixture.finished == true || fixture.finishedProvisional == true) {
-                            try {
-                                val kickoffTime = fixture.kickoffTime?.let { java.time.Instant.parse(it) }
-                                if (kickoffTime != null) {
-                                    val now = java.time.Instant.now()
-                                    val gameEndTime = kickoffTime.plusSeconds(90 * 60 + 45 * 60)
-                                    val hoursSinceEnd = java.time.Duration.between(gameEndTime, now).toHours()
-                                    hoursSinceEnd < 3
-                                } else {
-                                    false
-                                }
-                            } catch (e: Exception) {
-                                false
-                            }
-                        } else {
-                            false
-                        }
+                    val fixturesNeedingBonus = fixtures.filter {
+                        it.started == true && it.finished == false
                     }
                     
-                    val fixturesNeedingBonus = liveFixtures + justFinishedFixtures
-                    
-                    Log.d("FormationBonus", "Fixtures needing bonus: ${fixturesNeedingBonus.size} (Live: ${liveFixtures.size}, Just finished: ${justFinishedFixtures.size})")
+                    Log.d("FormationBonus", "Fixtures with live data: ${fixturesNeedingBonus.size} (Truly live: ${liveFixtures.size})")
                     
                     fixturesNeedingBonus.forEach { fixture ->
                         val homeTeam = bootstrap.teams.find { it.id == fixture.teamH }

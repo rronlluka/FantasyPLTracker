@@ -381,28 +381,31 @@ fun EnhancedStandingRow(
             modifier = Modifier.width(50.dp)
         )
         
-        // GW Pts (with live points if applicable)
-        val hasLivePoints = liveData != null && liveData.livePoints > 0
+        // GW Pts (calculated total, may differ from API if not updated yet)
+        val hasLivePoints = liveData != null && liveData.livePoints != 0
+        val calculatedGwPoints = standing.eventTotal + (liveData?.livePoints ?: 0)
         Column(
             modifier = Modifier.width(60.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             if (hasLivePoints) {
-                // Show live total
+                // Show calculated total
                 Text(
-                    text = "${standing.eventTotal + (liveData?.livePoints ?: 0)}",
+                    text = "$calculatedGwPoints",
                     color = Color(0xFF00FF87),
                     fontWeight = FontWeight.Bold,
                     fontSize = 13.sp,
                     textAlign = TextAlign.Center
                 )
-                // Show base points in smaller text
-                Text(
-                    text = "(${standing.eventTotal})",
-                    color = Color.Gray,
-                    fontSize = 10.sp,
-                    textAlign = TextAlign.Center
-                )
+                // Show base points in smaller text if different
+                if (liveData!!.livePoints > 0) {
+                    Text(
+                        text = "(${standing.eventTotal})",
+                        color = Color.Gray,
+                        fontSize = 10.sp,
+                        textAlign = TextAlign.Center
+                    )
+                }
             } else {
                 Text(
                     text = "${standing.eventTotal}",

@@ -85,47 +85,23 @@ class ManagerStatsViewModel : ViewModel() {
                     // Calculate provisional bonus ONCE for all fixtures needing it
                     val globalProvisionalBonus = mutableMapOf<Int, Int>()
                     
-                    // Truly live fixtures
+                    // Truly live fixtures (for visual "LIVE" indicator)
                     val liveFixtures = fixtures.filter { 
                         it.started == true && it.finished == false && it.finishedProvisional == false
                     }
                     
-                    // Just finished fixtures (within 3 hours) - need bonus calculation too!
-                    val justFinishedFixtures = fixtures.filter { fixture ->
-                        if (fixture.finished == true || fixture.finishedProvisional == true) {
-                            try {
-                                val kickoffTime = fixture.kickoffTime?.let { java.time.Instant.parse(it) }
-                                if (kickoffTime != null) {
-                                    val now = java.time.Instant.now()
-                                    val gameEndTime = kickoffTime.plusSeconds(90 * 60 + 45 * 60)
-                                    val hoursSinceEnd = java.time.Duration.between(gameEndTime, now).toHours()
-                                    hoursSinceEnd < 3
-                                } else {
-                                    false
-                                }
-                            } catch (e: Exception) {
-                                false
-                            }
-                        } else {
-                            false
-                        }
+                    // All fixtures with live data (started but not finished by FPL)
+                    val fixturesNeedingBonus = fixtures.filter {
+                        it.started == true && it.finished == false
                     }
-                    
-                    // Fixtures needing bonus calculation (live OR just finished)
-                    val fixturesNeedingBonus = liveFixtures + justFinishedFixtures
                     
                     Log.d("ManagerStats", "Truly live fixtures: ${liveFixtures.size}")
-                    liveFixtures.forEach { fixture ->
+                    Log.d("ManagerStats", "Fixtures with live data: ${fixturesNeedingBonus.size}")
+                    fixturesNeedingBonus.forEach { fixture ->
                         val homeTeam = bootstrap.teams.find { it.id == fixture.teamH }
                         val awayTeam = bootstrap.teams.find { it.id == fixture.teamA }
-                        Log.d("ManagerStats", "  - LIVE: ${homeTeam?.shortName} vs ${awayTeam?.shortName} (${fixture.minutes}')")
-                    }
-                    
-                    Log.d("ManagerStats", "Just finished fixtures: ${justFinishedFixtures.size}")
-                    justFinishedFixtures.forEach { fixture ->
-                        val homeTeam = bootstrap.teams.find { it.id == fixture.teamH }
-                        val awayTeam = bootstrap.teams.find { it.id == fixture.teamA }
-                        Log.d("ManagerStats", "  - JUST FINISHED: ${homeTeam?.shortName} vs ${awayTeam?.shortName}")
+                        val status = if (fixture.finishedProvisional == true) "PROCESSING" else "LIVE"
+                        Log.d("ManagerStats", "  - [$status] ${homeTeam?.shortName} vs ${awayTeam?.shortName}")
                     }
                     
                     fixturesNeedingBonus.forEach { fixture ->
@@ -169,59 +145,25 @@ class ManagerStatsViewModel : ViewModel() {
                                 it.teamH == player.team || it.teamA == player.team 
                             }
                             
-                            // Check if we should count points from live API
-                            var shouldCountLivePoints = false
-                            var isTrulyLive = false
+                            // Use live data if game started but not finished by FPL
+                            val shouldCountLivePoints = fixture?.started == true && fixture.finished == false
                             
-                            if (fixture != null) {
-                                // Live game
-                                isTrulyLive = fixture.started == true && 
-                                    fixture.finished == false && 
-                                    fixture.finishedProvisional == false
-                                
-                                // Just finished (within 3 hours)
-                                val isJustFinished = if (fixture.finished == true || fixture.finishedProvisional == true) {
-                                    try {
-                                        val kickoffTime = fixture.kickoffTime?.let { 
-                                            java.time.Instant.parse(it) 
-                                        }
-                                        if (kickoffTime != null) {
-                                            val now = java.time.Instant.now()
-                                            val gameEndTime = kickoffTime.plusSeconds(90 * 60 + 45 * 60) // ~135 mins for full game
-                                            val hoursSinceEnd = java.time.Duration.between(gameEndTime, now).toHours()
-                                            hoursSinceEnd < 3
-                                        } else {
-                                            false
-                                        }
-                                    } catch (e: Exception) {
-                                        false
-                                    }
-                                } else {
-                                    false
-                                }
-                                
-                                shouldCountLivePoints = isTrulyLive || isJustFinished
-                                
-                                Log.d("ManagerStats", "${player.webName}: " +
-                                    "isTrulyLive=$isTrulyLive, isJustFinished=$isJustFinished, shouldCount=$shouldCountLivePoints")
-                            }
-                            
-                            // Get live stats if we should count them
                             if (shouldCountLivePoints) {
                                 val liveStats = liveGameweek.elements.find { it.id == playerId }
                                 
                                 if (liveStats != null) {
                                     var playerPoints = liveStats.stats.totalPoints
                                     
-                                    // Add provisional bonus if player doesn't have bonus yet
-                                    // (works for both truly live AND just finished games)
+                                    // Add provisional bonus ONLY if API hasn't provided bonus yet
+                                    // If API has bonus > 0, it means FPL already calculated it
                                     val currentBonus = liveStats.stats.bonus
                                     val provisionalBonusPoints = globalProvisionalBonus[playerId] ?: 0
                                     
                                     if (currentBonus == 0 && provisionalBonusPoints > 0) {
                                         playerPoints += provisionalBonusPoints
-                                        val gameState = if (isTrulyLive) "LIVE" else "JUST FINISHED"
-                                        Log.d("ManagerStats", "${player.webName} ($gameState): Adding provisional bonus +$provisionalBonusPoints")
+                                        Log.d("ManagerStats", "${player.webName}: +$provisionalBonusPoints provisional bonus")
+                                    } else if (currentBonus > 0) {
+                                        Log.d("ManagerStats", "${player.webName}: API provided bonus=$currentBonus (no provisional needed)")
                                     }
                                     
                                     // Apply captain multiplier
