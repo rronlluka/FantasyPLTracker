@@ -128,13 +128,15 @@ fun ManagerFormationScreen(
                                 containerColor = Color(0xFF37003C)
                             )
                         ) {
-                            // Calculate live points with provisional bonus
+                            // Calculate live points - sum up starting XI with live/just finished games
                             var livePoints = 0
                             startingXI.forEach { playerDetail ->
-                                if (playerDetail.isLive && playerDetail.liveStats != null) {
+                                // Count points if hasLivePoints (live or just finished within 3 hours)
+                                if (playerDetail.hasLivePoints && playerDetail.liveStats != null) {
                                     var pts = playerDetail.liveStats.stats.totalPoints
                                     
-                                    // Add provisional bonus
+                                    // Add provisional bonus if player doesn't have bonus yet
+                                    // (works for both truly live AND just finished games)
                                     val currentBonus = playerDetail.liveStats.stats.bonus
                                     val provisionalBonusPoints = uiState.provisionalBonus[playerDetail.player.id] ?: 0
                                     if (currentBonus == 0 && provisionalBonusPoints > 0) {

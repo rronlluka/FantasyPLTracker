@@ -250,14 +250,20 @@ fun PlayerCardOnPitch(
     provisionalBonus: Map<Int, Int> = emptyMap(),
     onPlayerClick: ((PlayerWithDetails) -> Unit)? = null
 ) {
-    val basePoints = playerDetail.liveStats?.stats?.totalPoints ?: playerDetail.player.eventPoints
     val isCaptain = playerDetail.pick.isCaptain
     val isViceCaptain = playerDetail.pick.isViceCaptain
     
-    // Add provisional bonus for live players
-    var points = basePoints
-    if (playerDetail.isLive) {
-        val currentBonus = playerDetail.liveStats?.stats?.bonus ?: 0
+    // Use live API data if hasLivePoints (live or just finished within 3 hours)
+    var points = if (playerDetail.hasLivePoints && playerDetail.liveStats != null) {
+        playerDetail.liveStats.stats.totalPoints
+    } else {
+        playerDetail.player.eventPoints
+    }
+    
+    // Add provisional bonus if player doesn't have bonus yet
+    // (works for both truly live AND just finished games within 3 hours)
+    if (playerDetail.hasLivePoints && playerDetail.liveStats != null) {
+        val currentBonus = playerDetail.liveStats.stats.bonus
         val provisionalBonusPoints = provisionalBonus[playerDetail.player.id] ?: 0
         if (currentBonus == 0 && provisionalBonusPoints > 0) {
             points += provisionalBonusPoints

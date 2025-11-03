@@ -105,12 +105,14 @@ object AutoSubstitutionHelper {
         effectiveXI.forEach { playerId ->
             val player = players.find { it.id == playerId }
             if (player != null) {
-                val fixture = fixtures.find { 
-                    it.teamH == player.team || it.teamA == player.team 
+                val fixture = fixtures.find {
+                    it.teamH == player.team || it.teamA == player.team
                 }
                 
+                val isFinished = fixture?.finished == true || fixture?.finishedProvisional == true
+
                 when {
-                    fixture?.started == true && fixture.finished == false -> inPlay++
+                    fixture?.started == true && !isFinished -> inPlay++
                     fixture?.started == false -> toStart++
                     // Finished games don't count
                 }

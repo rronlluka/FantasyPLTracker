@@ -40,7 +40,6 @@ fun EnhancedLeagueStandingsScreen(
     val uiState by viewModel.uiState.collectAsState()
     
     var showFavoriteDialog by remember { mutableStateOf(false) }
-    var showChangeLeagueDialog by remember { mutableStateOf(false) }
     val isFavorite = remember(leagueId) { 
         prefsManager.getFavoriteLeagueId() == leagueId 
     }
@@ -84,9 +83,11 @@ fun EnhancedLeagueStandingsScreen(
                         )
                     }
                     
-                    // Change league button
-                    IconButton(onClick = { showChangeLeagueDialog = true }) {
-                        Icon(Icons.Filled.Refresh, "Change League")
+                    // Refresh button
+                    IconButton(onClick = { 
+                        viewModel.loadLeagueStandings(leagueId)
+                    }) {
+                        Icon(Icons.Filled.Refresh, "Refresh")
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -141,13 +142,11 @@ fun EnhancedLeagueStandingsScreen(
                         uiState.leagueStandings!!.standings.results
                     }
                     
-                    val hasLiveData = uiState.managerLiveData.isNotEmpty()
-                    
                     LazyColumn(
                         modifier = Modifier.fillMaxSize()
                     ) {
-                        // Live indicator banner
-                        if (hasLiveData) {
+                        // Live indicator banner - only show when games are truly live
+                        if (uiState.hasLiveFixtures) {
                             item {
                                 Box(
                                     modifier = Modifier
@@ -222,42 +221,6 @@ fun EnhancedLeagueStandingsScreen(
             )
         }
         
-        // Change League Dialog
-        if (showChangeLeagueDialog) {
-            var newLeagueId by remember { mutableStateOf("") }
-            
-            AlertDialog(
-                onDismissRequest = { showChangeLeagueDialog = false },
-                title = { Text("Change League") },
-                text = {
-                    OutlinedTextField(
-                        value = newLeagueId,
-                        onValueChange = { newLeagueId = it },
-                        label = { Text("League ID") },
-                        singleLine = true
-                    )
-                },
-                confirmButton = {
-                    Button(
-                        onClick = {
-                            newLeagueId.toLongOrNull()?.let { id ->
-                                showChangeLeagueDialog = false
-                                navController.navigate(Screen.LeagueStandings.createRoute(id)) {
-                                    popUpTo(Screen.LeagueStandings.route) { inclusive = true }
-                                }
-                            }
-                        }
-                    ) {
-                        Text("Go")
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = { showChangeLeagueDialog = false }) {
-                        Text("Cancel")
-                    }
-                }
-            )
-        }
     }
 }
 
@@ -419,7 +382,7 @@ fun EnhancedStandingRow(
         )
         
         // GW Pts (with live points if applicable)
-        val hasLivePoints = playersInPlay > 0 && liveData != null
+        val hasLivePoints = liveData != null && liveData.livePoints > 0
         Column(
             modifier = Modifier.width(60.dp),
             horizontalAlignment = Alignment.CenterHorizontally
@@ -466,7 +429,7 @@ fun EnhancedStandingRow(
                     textAlign = TextAlign.Center
                 )
                 // Show added live points
-                if (liveData.livePoints > 0) {
+                if (liveData!!.livePoints > 0) {
                     Text(
                         text = "+${liveData.livePoints}",
                         color = Color(0xFF00FF87),

@@ -6,12 +6,11 @@ import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
-import com.fpl.tracker.ui.screens.EnhancedInitialScreen
-import com.fpl.tracker.ui.screens.EnhancedLeagueStandingsScreen
-import com.fpl.tracker.ui.screens.ManagerFormationScreen
-import com.fpl.tracker.ui.screens.ManagerStatsScreen
+import com.fpl.tracker.ui.screens.*
 
 sealed class Screen(val route: String) {
+    object Login : Screen("login")
+    object MainApp : Screen("main_app")
     object Initial : Screen("initial")
     object ManagerStats : Screen("manager_stats/{managerId}") {
         fun createRoute(managerId: Long) = "manager_stats/$managerId"
@@ -33,6 +32,14 @@ fun NavGraph(
         navController = navController,
         startDestination = startDestination
     ) {
+        composable(Screen.Login.route) {
+            LoginScreen(navController)
+        }
+        
+        composable(Screen.MainApp.route) {
+            MainAppScreen(navController)
+        }
+        
         composable(Screen.Initial.route) {
             EnhancedInitialScreen(navController)
         }

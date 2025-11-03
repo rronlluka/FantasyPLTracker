@@ -16,6 +16,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.material3.LocalContentColor
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.fpl.tracker.data.preferences.PreferencesManager
@@ -143,7 +144,97 @@ fun ManagerStatsScreen(
                                     
                                     StatsRow("Overall Points", managerData.summaryOverallPoints.toString())
                                     StatsRow("Overall Rank", "#${String.format("%,d", managerData.summaryOverallRank)}")
-                                    StatsRow("Gameweek Points", managerData.summaryEventPoints.toString())
+                                    
+                                    // Show live points if there are any
+                                    if (uiState.livePoints > 0) {
+                                        // Only show LIVE banner if games are truly live (not just finished)
+                                        if (uiState.hasLiveFixtures) {
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.Center
+                                            ) {
+                                                Card(
+                                                    colors = CardDefaults.cardColors(
+                                                        containerColor = Color(0xFFFF0000)
+                                                    ),
+                                                    modifier = Modifier.padding(vertical = 8.dp)
+                                                ) {
+                                                    Text(
+                                                        text = "🔴 LIVE",
+                                                        color = Color.White,
+                                                        fontWeight = FontWeight.Bold,
+                                                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+                                                    )
+                                                }
+                                            }
+                                        }
+                                        
+                                        StatsRow("Base GW Points", managerData.summaryEventPoints.toString())
+                                        StatsRow(
+                                            "Live Points", 
+                                            "+${uiState.livePoints}",
+                                            valueColor = Color(0xFF00FF87)
+                                        )
+                                        StatsRow(
+                                            "Total GW Points",
+                                            uiState.totalLivePoints.toString(),
+                                            valueFontWeight = FontWeight.Bold
+                                        )
+                                        
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceEvenly
+                                        ) {
+                                            Card(
+                                                colors = CardDefaults.cardColors(
+                                                    containerColor = Color(0xFF00FF87).copy(alpha = 0.2f)
+                                                ),
+                                                modifier = Modifier.weight(1f).padding(end = 4.dp)
+                                            ) {
+                                                Column(
+                                                    modifier = Modifier.padding(8.dp),
+                                                    horizontalAlignment = Alignment.CenterHorizontally
+                                                ) {
+                                                    Text(
+                                                        text = uiState.inPlay.toString(),
+                                                        style = MaterialTheme.typography.headlineSmall,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = Color(0xFF00FF87)
+                                                    )
+                                                    Text(
+                                                        text = "In Play",
+                                                        style = MaterialTheme.typography.bodySmall
+                                                    )
+                                                }
+                                            }
+                                            Card(
+                                                colors = CardDefaults.cardColors(
+                                                    containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
+                                                ),
+                                                modifier = Modifier.weight(1f).padding(start = 4.dp)
+                                            ) {
+                                                Column(
+                                                    modifier = Modifier.padding(8.dp),
+                                                    horizontalAlignment = Alignment.CenterHorizontally
+                                                ) {
+                                                    Text(
+                                                        text = uiState.toStart.toString(),
+                                                        style = MaterialTheme.typography.headlineSmall,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = MaterialTheme.colorScheme.primary
+                                                    )
+                                                    Text(
+                                                        text = "To Start",
+                                                        style = MaterialTheme.typography.bodySmall
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    } else {
+                                        StatsRow("Gameweek Points", managerData.summaryEventPoints.toString())
+                                    }
+                                    
                                     managerData.summaryEventRank?.let {
                                         StatsRow("Gameweek Rank", "#${String.format("%,d", it)}")
                                     }
@@ -318,7 +409,12 @@ fun ManagerStatsScreen(
 }
 
 @Composable
-fun StatsRow(label: String, value: String) {
+fun StatsRow(
+    label: String, 
+    value: String,
+    valueColor: Color? = null,
+    valueFontWeight: FontWeight = FontWeight.SemiBold
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -332,7 +428,8 @@ fun StatsRow(label: String, value: String) {
         Text(
             text = value,
             style = MaterialTheme.typography.bodyLarge,
-            fontWeight = FontWeight.SemiBold
+            fontWeight = valueFontWeight,
+            color = valueColor ?: LocalContentColor.current
         )
     }
 }

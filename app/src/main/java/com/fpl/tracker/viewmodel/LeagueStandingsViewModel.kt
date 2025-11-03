@@ -29,6 +29,7 @@ data class LeagueStandingsUiState(
     val currentEvent: Int = 1,
     val managerLiveData: Map<Int, ManagerLiveData> = emptyMap(),
     val liveRankings: List<StandingEntry> = emptyList(),
+    val hasLiveFixtures: Boolean = false,  // True only when games are actually live (not just finished)
     val error: String? = null
 )
 
@@ -123,6 +124,17 @@ class LeagueStandingsViewModel : ViewModel() {
                 val fixturesResult = repository.getFixturesByEvent(currentEvent)
                 val fixtures = fixturesResult.getOrNull() ?: emptyList()
                 
+                // Log fixture statuses for debugging
+                Log.d("LeagueStandings", "=== FIXTURE STATUS DEBUG ===")
+                fixtures.forEach { fixture ->
+                    val homeTeam = bootstrapResult.getOrNull()?.teams?.find { it.id == fixture.teamH }
+                    val awayTeam = bootstrapResult.getOrNull()?.teams?.find { it.id == fixture.teamA }
+                    Log.d("LeagueStandings", "${homeTeam?.shortName} vs ${awayTeam?.shortName}: " +
+                        "Started=${fixture.started}, Finished=${fixture.finished}, " +
+                        "FinishedProvisional=${fixture.finishedProvisional}, Minutes=${fixture.minutes}")
+                }
+                Log.d("LeagueStandings", "===========================")
+                
                 // Load live gameweek data
                 val liveGameweekResult = repository.getLiveGameweek(currentEvent)
                 val liveGameweek = liveGameweekResult.getOrNull()
@@ -130,17 +142,62 @@ class LeagueStandingsViewModel : ViewModel() {
                 // Calculate provisional bonus ONCE per fixture (for ALL players)
                 val globalProvisionalBonus = mutableMapOf<Int, Int>()
                 
+                // Truly live fixtures
+                val liveFixtures = fixtures.filter { 
+                    it.started == true && it.finished == false && it.finishedProvisional == false
+                }
+                
+                // Just finished fixtures (within 3 hours) - need bonus calculation too!
+                val justFinishedFixtures = fixtures.filter { fixture ->
+                    if (fixture.finished == true || fixture.finishedProvisional == true) {
+                        try {
+                            val kickoffTime = fixture.kickoffTime?.let { java.time.Instant.parse(it) }
+                            if (kickoffTime != null) {
+                                val now = java.time.Instant.now()
+                                val gameEndTime = kickoffTime.plusSeconds(90 * 60 + 45 * 60)
+                                val hoursSinceEnd = java.time.Duration.between(gameEndTime, now).toHours()
+                                hoursSinceEnd < 3
+                            } else {
+                                false
+                            }
+                        } catch (e: Exception) {
+                            false
+                        }
+                    } else {
+                        false
+                    }
+                }
+                
+                // Fixtures needing bonus calculation (live OR just finished)
+                val fixturesNeedingBonus = liveFixtures + justFinishedFixtures
+                
+                Log.d("LeagueStandings", "Truly live fixtures: ${liveFixtures.size}")
+                liveFixtures.forEach { fixture ->
+                    val homeTeam = bootstrapResult.getOrNull()?.teams?.find { it.id == fixture.teamH }
+                    val awayTeam = bootstrapResult.getOrNull()?.teams?.find { it.id == fixture.teamA }
+                    Log.d("LeagueStandings", "  - LIVE: ${homeTeam?.shortName} vs ${awayTeam?.shortName} (${fixture.minutes}')")
+                }
+                
+                Log.d("LeagueStandings", "Just finished fixtures: ${justFinishedFixtures.size}")
+                justFinishedFixtures.forEach { fixture ->
+                    val homeTeam = bootstrapResult.getOrNull()?.teams?.find { it.id == fixture.teamH }
+                    val awayTeam = bootstrapResult.getOrNull()?.teams?.find { it.id == fixture.teamA }
+                    Log.d("LeagueStandings", "  - JUST FINISHED: ${homeTeam?.shortName} vs ${awayTeam?.shortName}")
+                }
+                
                 if (liveGameweek != null) {
                     Log.d("BonusCalc", "=================================================")
-                    Log.d("BonusCalc", "LIVE GAMEWEEK DATA - Event $currentEvent")
+                    Log.d("BonusCalc", "CALCULATING BONUS FOR ${fixturesNeedingBonus.size} FIXTURES")
                     Log.d("BonusCalc", "=================================================")
                     
-                    fixtures.filter { it.started == true && it.finished == false }.forEach { fixture ->
+                    fixturesNeedingBonus.forEach { fixture ->
                         val homeTeam = bootstrapResult.getOrNull()?.teams?.find { it.id == fixture.teamH }
                         val awayTeam = bootstrapResult.getOrNull()?.teams?.find { it.id == fixture.teamA }
+                        val isJustFinished = justFinishedFixtures.contains(fixture)
+                        val status = if (isJustFinished) "JUST FINISHED" else "LIVE"
                         
                         Log.d("BonusCalc", "")
-                        Log.d("BonusCalc", "🔴 LIVE FIXTURE ${fixture.id}: ${homeTeam?.shortName ?: fixture.teamH} vs ${awayTeam?.shortName ?: fixture.teamA}")
+                        Log.d("BonusCalc", "[$status] FIXTURE ${fixture.id}: ${homeTeam?.shortName ?: fixture.teamH} vs ${awayTeam?.shortName ?: fixture.teamA}")
                         Log.d("BonusCalc", "Minutes: ${fixture.minutes}")
                         
                         // Get ALL players in this fixture (both teams, all 22 players)
@@ -227,20 +284,59 @@ class LeagueStandingsViewModel : ViewModel() {
                                                 it.teamH == player.team || it.teamA == player.team 
                                             }
                                             
-                                            // Only count points from live matches
-                                            if (fixture?.started == true && fixture.finished == false) {
+                                            // Check if we should count points from live API
+                                            var shouldCountLivePoints = false
+                                            var isTrulyLive = false
+                                            
+                                            if (fixture != null) {
+                                                // Live game
+                                                isTrulyLive = fixture.started == true && 
+                                                    fixture.finished == false && 
+                                                    fixture.finishedProvisional == false
+                                                
+                                                // Just finished (within 3 hours)
+                                                val isJustFinished = if (fixture.finished == true || fixture.finishedProvisional == true) {
+                                                    try {
+                                                        val kickoffTime = fixture.kickoffTime?.let { 
+                                                            java.time.Instant.parse(it) 
+                                                        }
+                                                        if (kickoffTime != null) {
+                                                            val now = java.time.Instant.now()
+                                                            val gameEndTime = kickoffTime.plusSeconds(90 * 60 + 45 * 60) // ~135 mins for full game
+                                                            val hoursSinceEnd = java.time.Duration.between(gameEndTime, now).toHours()
+                                                            hoursSinceEnd < 3
+                                                        } else {
+                                                            false
+                                                        }
+                                                    } catch (e: Exception) {
+                                                        false
+                                                    }
+                                                } else {
+                                                    false
+                                                }
+                                                
+                                                shouldCountLivePoints = isTrulyLive || isJustFinished
+                                                
+                                                Log.d("LeagueStandings", "${standing.entryName} - ${player.webName}: " +
+                                                    "isTrulyLive=$isTrulyLive, isJustFinished=$isJustFinished, shouldCount=$shouldCountLivePoints")
+                                            }
+                                            
+                                            // Get live stats if we should count them
+                                            if (shouldCountLivePoints) {
                                                 val liveStats = liveGameweek?.elements?.find { it.id == playerId }
                                                 
                                                 if (liveStats != null) {
                                                     var playerPoints = liveStats.stats.totalPoints
                                                     
-                                                    // Use GLOBAL provisional bonus (calculated from all 22 players)
+                                                    // Add provisional bonus if player doesn't have bonus yet
+                                                    // (works for both truly live AND just finished games)
                                                     val currentBonus = liveStats.stats.bonus
                                                     val provisionalBonusPoints = globalProvisionalBonus[playerId] ?: 0
                                                     
                                                     if (currentBonus == 0 && provisionalBonusPoints > 0) {
                                                         playerPoints += provisionalBonusPoints
-                                                        Log.d("BonusCalc", "${standing.entryName} - ${player.webName}: Adding provisional bonus +$provisionalBonusPoints (Total: $playerPoints)")
+                                                        val gameState = if (isTrulyLive) "LIVE" else "JUST FINISHED"
+                                                        Log.d("LeagueStandings", "${standing.entryName} - ${player.webName} ($gameState): Adding provisional bonus +$provisionalBonusPoints")
                                                     }
                                                     
                                                     // Apply captain multiplier
@@ -250,11 +346,13 @@ class LeagueStandingsViewModel : ViewModel() {
                                                     val pointsWithMultiplier = playerPoints * multiplier
                                                     livePoints += pointsWithMultiplier
                                                     
-                                                    Log.d("BonusCalc", "${standing.entryName} - ${player.webName}: $playerPoints pts × $multiplier = $pointsWithMultiplier")
+                                                    Log.d("LeagueStandings", "${standing.entryName} - ${player.webName}: ${playerPoints}pts × ${multiplier} = $pointsWithMultiplier")
                                                 }
                                             }
                                         }
                                     }
+                                    
+                                    Log.d("LeagueStandings", "Manager ${standing.entryName}: Base=${standing.eventTotal}, Live=$livePoints, Total=${standing.eventTotal + livePoints}")
                                     
                                     val totalLivePoints = standing.eventTotal + livePoints
                                     
@@ -295,7 +393,8 @@ class LeagueStandingsViewModel : ViewModel() {
                     leagueStandings = leagueStandings,
                     currentEvent = currentEvent,
                     managerLiveData = managerLiveDataMap,
-                    liveRankings = liveRankings
+                    liveRankings = liveRankings,
+                    hasLiveFixtures = liveFixtures.isNotEmpty()  // Only true when games are truly live
                 )
             }
         }
