@@ -26,6 +26,7 @@ import com.fpl.tracker.data.models.StandingEntry
 import com.fpl.tracker.data.preferences.PreferencesManager
 import com.fpl.tracker.navigation.Screen
 import com.fpl.tracker.viewmodel.LeagueStandingsViewModel
+import com.fpl.tracker.viewmodel.ManagerLiveData
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -133,11 +134,38 @@ fun EnhancedLeagueStandingsScreen(
                     }
                 }
                 uiState.leagueStandings != null -> {
-                    val standings = uiState.leagueStandings!!.standings.results
+                    // Use live rankings if available, otherwise use original
+                    val standings = if (uiState.liveRankings.isNotEmpty()) {
+                        uiState.liveRankings
+                    } else {
+                        uiState.leagueStandings!!.standings.results
+                    }
+                    
+                    val hasLiveData = uiState.managerLiveData.isNotEmpty()
                     
                     LazyColumn(
                         modifier = Modifier.fillMaxSize()
                     ) {
+                        // Live indicator banner
+                        if (hasLiveData) {
+                            item {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .background(Color(0xFFFF5722))
+                                        .padding(8.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        "🔴 LIVE - Rankings updating in real-time",
+                                        color = Color.White,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 12.sp
+                                    )
+                                }
+                            }
+                        }
+                        
                         // Header Row
                         item {
                             LeagueTableHeader()
@@ -152,6 +180,7 @@ fun EnhancedLeagueStandingsScreen(
                                 isUserTeam = isUserTeam,
                                 playersInPlay = liveData?.inPlay ?: 0,
                                 playersToStart = liveData?.toStart ?: 0,
+                                liveData = liveData,
                                 onClick = {
                                     navController.navigate(
                                         Screen.ManagerFormation.createRoute(
@@ -272,12 +301,12 @@ fun LeagueTableHeader() {
             modifier = Modifier.width(50.dp)
         )
         Text(
-            "GW Net",
+            "GW Pts",
             color = Color.White,
             fontWeight = FontWeight.Bold,
             fontSize = 11.sp,
             textAlign = TextAlign.Center,
-            modifier = Modifier.width(50.dp)
+            modifier = Modifier.width(60.dp)
         )
         Text(
             "Total",
@@ -285,7 +314,7 @@ fun LeagueTableHeader() {
             fontWeight = FontWeight.Bold,
             fontSize = 11.sp,
             textAlign = TextAlign.Center,
-            modifier = Modifier.width(50.dp)
+            modifier = Modifier.width(60.dp)
         )
     }
 }
@@ -296,6 +325,7 @@ fun EnhancedStandingRow(
     isUserTeam: Boolean,
     playersInPlay: Int,
     playersToStart: Int,
+    liveData: ManagerLiveData?,
     onClick: () -> Unit
 ) {
     // Calculate rank change
@@ -388,25 +418,72 @@ fun EnhancedStandingRow(
             modifier = Modifier.width(50.dp)
         )
         
-        // GW Net
-        Text(
-            text = "${standing.eventTotal}",
-            color = Color.White,
-            fontWeight = FontWeight.Bold,
-            fontSize = 13.sp,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.width(50.dp)
-        )
+        // GW Pts (with live points if applicable)
+        val hasLivePoints = playersInPlay > 0 && liveData != null
+        Column(
+            modifier = Modifier.width(60.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            if (hasLivePoints) {
+                // Show live total
+                Text(
+                    text = "${standing.eventTotal + (liveData?.livePoints ?: 0)}",
+                    color = Color(0xFF00FF87),
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 13.sp,
+                    textAlign = TextAlign.Center
+                )
+                // Show base points in smaller text
+                Text(
+                    text = "(${standing.eventTotal})",
+                    color = Color.Gray,
+                    fontSize = 10.sp,
+                    textAlign = TextAlign.Center
+                )
+            } else {
+                Text(
+                    text = "${standing.eventTotal}",
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 13.sp,
+                    textAlign = TextAlign.Center
+                )
+            }
+        }
         
-        // Total
-        Text(
-            text = "${standing.total}",
-            color = Color.White,
-            fontWeight = FontWeight.Bold,
-            fontSize = 13.sp,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.width(50.dp)
-        )
+        // Total (with live points added)
+        Column(
+            modifier = Modifier.width(60.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            if (hasLivePoints) {
+                // Show live total (already updated in standings)
+                Text(
+                    text = "${standing.total}",
+                    color = Color(0xFF00FF87),
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 13.sp,
+                    textAlign = TextAlign.Center
+                )
+                // Show added live points
+                if (liveData.livePoints > 0) {
+                    Text(
+                        text = "+${liveData.livePoints}",
+                        color = Color(0xFF00FF87),
+                        fontSize = 9.sp,
+                        textAlign = TextAlign.Center
+                    )
+                }
+            } else {
+                Text(
+                    text = "${standing.total}",
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 13.sp,
+                    textAlign = TextAlign.Center
+                )
+            }
+        }
     }
     
     Divider(color = Color(0xFF2D2D2D), thickness = 1.dp)

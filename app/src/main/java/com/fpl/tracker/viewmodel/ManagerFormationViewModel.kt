@@ -2,9 +2,11 @@ package com.fpl.tracker.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import android.util.Log
 import com.fpl.tracker.data.api.RetrofitInstance
 import com.fpl.tracker.data.models.*
 import com.fpl.tracker.data.repository.FPLRepository
+import com.fpl.tracker.utils.BonusPointsCalculator
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -28,6 +30,7 @@ data class ManagerFormationUiState(
     val liveGameweek: LiveGameweek? = null,
     val fixtures: List<Fixture> = emptyList(),
     val playersWithDetails: List<PlayerWithDetails> = emptyList(),
+    val provisionalBonus: Map<Int, Int> = emptyMap(),
     val error: String? = null
 )
 
@@ -102,13 +105,37 @@ class ManagerFormationViewModel : ViewModel() {
                     )
                 }
                 
+                // Calculate provisional bonus for live fixtures
+                val provisionalBonus = mutableMapOf<Int, Int>()
+                if (live != null) {
+                    fixtures.filter { it.started == true && it.finished == false }.forEach { fixture ->
+                        val fixturePlayersBps = live.elements
+                            .filter { liveEl ->
+                                val player = bootstrap.elements.find { it.id == liveEl.id }
+                                player != null && (player.team == fixture.teamH || player.team == fixture.teamA)
+                            }
+                            .sortedByDescending { it.stats.bps }
+                        
+                        if (fixturePlayersBps.isNotEmpty()) {
+                            val fixtureBonus = BonusPointsCalculator.calculateProvisionalBonus(
+                                fixturePlayersBps,
+                                fixture.id
+                            )
+                            provisionalBonus.putAll(fixtureBonus)
+                            
+                            Log.d("FormationBonus", "Fixture ${fixture.id} provisional bonus: $fixtureBonus")
+                        }
+                    }
+                }
+                
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
                     managerPicks = picks,
                     bootstrapData = bootstrap,
                     liveGameweek = live,
                     fixtures = fixtures,
-                    playersWithDetails = playersWithDetails
+                    playersWithDetails = playersWithDetails,
+                    provisionalBonus = provisionalBonus
                 )
             }
         }

@@ -128,27 +128,56 @@ fun ManagerFormationScreen(
                                 containerColor = Color(0xFF37003C)
                             )
                         ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(16.dp),
-                                horizontalArrangement = Arrangement.SpaceAround
-                            ) {
-                                StatItem(
-                                    label = "GW Points",
-                                    value = "${managerPicks.entryHistory.points}",
-                                    highlighted = true
-                                )
-                                StatItem(
-                                    label = "Total Points",
-                                    value = "${managerPicks.entryHistory.totalPoints}"
-                                )
-                                StatItem(
-                                    label = "GW Rank",
-                                    value = managerPicks.entryHistory.rank?.let { 
-                                        "#${String.format("%,d", it)}" 
-                                    } ?: "N/A"
-                                )
+                            // Calculate live points with provisional bonus
+                            var livePoints = 0
+                            startingXI.forEach { playerDetail ->
+                                if (playerDetail.isLive && playerDetail.liveStats != null) {
+                                    var pts = playerDetail.liveStats.stats.totalPoints
+                                    
+                                    // Add provisional bonus
+                                    val currentBonus = playerDetail.liveStats.stats.bonus
+                                    val provisionalBonusPoints = uiState.provisionalBonus[playerDetail.player.id] ?: 0
+                                    if (currentBonus == 0 && provisionalBonusPoints > 0) {
+                                        pts += provisionalBonusPoints
+                                    }
+                                    
+                                    livePoints += pts * playerDetail.pick.multiplier
+                                }
+                            }
+                            
+                            val totalGwPoints = managerPicks.entryHistory.points + livePoints
+                            
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceAround
+                                ) {
+                                    StatItem(
+                                        label = "GW Points",
+                                        value = "$totalGwPoints",
+                                        highlighted = true
+                                    )
+                                    StatItem(
+                                        label = "Total Points",
+                                        value = "${managerPicks.entryHistory.totalPoints + livePoints}"
+                                    )
+                                    StatItem(
+                                        label = "GW Rank",
+                                        value = managerPicks.entryHistory.rank?.let { 
+                                            "#${String.format("%,d", it)}" 
+                                        } ?: "N/A"
+                                    )
+                                }
+                                
+                                if (livePoints > 0) {
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Text(
+                                        text = "🔴 Live: +$livePoints pts from ${startingXI.count { it.isLive }} players",
+                                        color = Color(0xFF00FF87),
+                                        fontSize = 12.sp,
+                                        modifier = Modifier.align(Alignment.CenterHorizontally)
+                                    )
+                                }
                             }
                         }
                         
@@ -198,6 +227,7 @@ fun ManagerFormationScreen(
                         
                         FootballPitch(
                             startingXI = startingXI,
+                            provisionalBonus = uiState.provisionalBonus,
                             onPlayerClick = { playerWithDetails ->
                                 selectedPlayer = playerWithDetails
                                 isLoadingPlayerData = true

@@ -32,6 +32,7 @@ import com.fpl.tracker.viewmodel.PlayerWithDetails
 @Composable
 fun FootballPitch(
     startingXI: List<PlayerWithDetails>,
+    provisionalBonus: Map<Int, Int> = emptyMap(),
     onPlayerClick: ((PlayerWithDetails) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
@@ -60,22 +61,22 @@ fun FootballPitch(
         ) {
             // Forwards
             if (forwards.isNotEmpty()) {
-                PlayerRow(players = forwards, onPlayerClick = onPlayerClick)
+                PlayerRow(players = forwards, provisionalBonus = provisionalBonus, onPlayerClick = onPlayerClick)
             }
             
             // Midfielders
             if (midfielders.isNotEmpty()) {
-                PlayerRow(players = midfielders, onPlayerClick = onPlayerClick)
+                PlayerRow(players = midfielders, provisionalBonus = provisionalBonus, onPlayerClick = onPlayerClick)
             }
             
             // Defenders
             if (defenders.isNotEmpty()) {
-                PlayerRow(players = defenders, onPlayerClick = onPlayerClick)
+                PlayerRow(players = defenders, provisionalBonus = provisionalBonus, onPlayerClick = onPlayerClick)
             }
             
             // Goalkeeper
             if (goalkeeper.isNotEmpty()) {
-                PlayerRow(players = goalkeeper, onPlayerClick = onPlayerClick)
+                PlayerRow(players = goalkeeper, provisionalBonus = provisionalBonus, onPlayerClick = onPlayerClick)
             }
         }
     }
@@ -223,6 +224,7 @@ fun PitchCanvas(modifier: Modifier = Modifier) {
 @Composable
 fun PlayerRow(
     players: List<PlayerWithDetails>,
+    provisionalBonus: Map<Int, Int> = emptyMap(),
     onPlayerClick: ((PlayerWithDetails) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
@@ -235,6 +237,7 @@ fun PlayerRow(
         players.forEach { playerDetail ->
             PlayerCardOnPitch(
                 playerDetail = playerDetail,
+                provisionalBonus = provisionalBonus,
                 onPlayerClick = onPlayerClick
             )
         }
@@ -244,11 +247,23 @@ fun PlayerRow(
 @Composable
 fun PlayerCardOnPitch(
     playerDetail: PlayerWithDetails,
+    provisionalBonus: Map<Int, Int> = emptyMap(),
     onPlayerClick: ((PlayerWithDetails) -> Unit)? = null
 ) {
-    val points = playerDetail.liveStats?.stats?.totalPoints ?: playerDetail.player.eventPoints
+    val basePoints = playerDetail.liveStats?.stats?.totalPoints ?: playerDetail.player.eventPoints
     val isCaptain = playerDetail.pick.isCaptain
     val isViceCaptain = playerDetail.pick.isViceCaptain
+    
+    // Add provisional bonus for live players
+    var points = basePoints
+    if (playerDetail.isLive) {
+        val currentBonus = playerDetail.liveStats?.stats?.bonus ?: 0
+        val provisionalBonusPoints = provisionalBonus[playerDetail.player.id] ?: 0
+        if (currentBonus == 0 && provisionalBonusPoints > 0) {
+            points += provisionalBonusPoints
+        }
+    }
+    
     val displayPoints = points * playerDetail.pick.multiplier
     
     // Get stats from live data
