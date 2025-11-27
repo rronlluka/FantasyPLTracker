@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.fpl.tracker.data.api.RetrofitInstance
 import com.fpl.tracker.data.models.Fixture
+import com.fpl.tracker.data.models.Player
 import com.fpl.tracker.data.models.Team
 import com.fpl.tracker.data.repository.FPLRepository
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -15,6 +16,7 @@ data class MatchesUiState(
     val isLoading: Boolean = false,
     val fixtures: List<Fixture> = emptyList(),
     val teams: List<Team> = emptyList(),
+    val players: List<Player> = emptyList(),
     val currentEvent: Int = 1,
     val error: String? = null
 )
@@ -33,6 +35,7 @@ class MatchesViewModel : ViewModel() {
             val bootstrapResult = repository.getBootstrapData()
             val currentEvent = bootstrapResult.getOrNull()?.events?.find { it.isCurrent }?.id ?: 1
             val teams = bootstrapResult.getOrNull()?.teams ?: emptyList()
+            val players = bootstrapResult.getOrNull()?.elements ?: emptyList()
             
             // Load fixtures
             val fixturesResult = repository.getFixturesByEvent(currentEvent)
@@ -47,6 +50,7 @@ class MatchesViewModel : ViewModel() {
                     isLoading = false,
                     fixtures = fixturesResult.getOrNull() ?: emptyList(),
                     teams = teams,
+                    players = players,
                     currentEvent = currentEvent
                 )
             }

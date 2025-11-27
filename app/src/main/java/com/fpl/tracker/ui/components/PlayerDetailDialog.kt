@@ -51,7 +51,7 @@ fun PlayerDetailDialog(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(Color(0xFF37003C))
+                        .background(MaterialTheme.colorScheme.primary)
                         .padding(16.dp)
                 ) {
                     Row(
@@ -106,8 +106,8 @@ fun PlayerDetailDialog(
                 // Tabs
                 TabRow(
                     selectedTabIndex = selectedTabIndex,
-                    containerColor = Color(0xFFF5F5F5),
-                    contentColor = Color(0xFF37003C)
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                    contentColor = MaterialTheme.colorScheme.primary
                 ) {
                     tabs.forEachIndexed { index, title ->
                         Tab(
@@ -139,7 +139,7 @@ fun PlayerDetailDialog(
                         .fillMaxWidth()
                         .padding(16.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFF37003C)
+                        containerColor = MaterialTheme.colorScheme.primary
                     )
                 ) {
                     Text("OK", fontSize = 16.sp)
@@ -478,7 +478,7 @@ fun StartsTab(leagueStats: LeaguePlayerStats?) {
             contentAlignment = Alignment.Center
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                CircularProgressIndicator(color = Color(0xFF37003C))
+                CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
                 Spacer(modifier = Modifier.height(8.dp))
                 Text("Loading league data...", color = Color.Gray)
             }
@@ -497,7 +497,7 @@ fun StartsTab(leagueStats: LeaguePlayerStats?) {
                 "Teams Who Started This Player",
                 fontWeight = FontWeight.Bold,
                 fontSize = 18.sp,
-                color = Color(0xFF37003C)
+                color = MaterialTheme.colorScheme.primary
             )
             Spacer(modifier = Modifier.height(8.dp))
         }
@@ -595,7 +595,7 @@ fun BenchTab(leagueStats: LeaguePlayerStats?) {
             contentAlignment = Alignment.Center
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                CircularProgressIndicator(color = Color(0xFF37003C))
+                CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
                 Spacer(modifier = Modifier.height(8.dp))
                 Text("Loading league data...", color = Color.Gray)
             }

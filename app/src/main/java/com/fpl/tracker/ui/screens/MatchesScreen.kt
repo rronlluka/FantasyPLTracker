@@ -46,7 +46,7 @@ fun MatchesScreen(
             text = "Gameweek ${uiState.currentEvent} Fixtures",
             fontSize = 24.sp,
             fontWeight = FontWeight.Bold,
-            color = Color(0xFF37003C),
+            color = MaterialTheme.colorScheme.primary,
             modifier = Modifier.padding(bottom = 16.dp)
         )
         
@@ -56,7 +56,7 @@ fun MatchesScreen(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center
                 ) {
-                    CircularProgressIndicator(color = Color(0xFF37003C))
+                    CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
                 }
             }
             uiState.error != null -> {
@@ -101,6 +101,7 @@ fun MatchesScreen(
             fixture = selectedFixture!!,
             homeTeam = uiState.teams.find { it.id == selectedFixture!!.teamH },
             awayTeam = uiState.teams.find { it.id == selectedFixture!!.teamA },
+            players = uiState.players,
             onDismiss = {
                 showFixtureDialog = false
                 selectedFixture = null
@@ -227,8 +228,18 @@ fun FixtureDetailDialog(
     fixture: Fixture,
     homeTeam: com.fpl.tracker.data.models.Team?,
     awayTeam: com.fpl.tracker.data.models.Team?,
+    players: List<com.fpl.tracker.data.models.Player>,
     onDismiss: () -> Unit
 ) {
+    // Debug logging
+    android.util.Log.d("MatchesScreen", "=== FIXTURE DETAIL ===")
+    android.util.Log.d("MatchesScreen", "Fixture ID: ${fixture.id}")
+    android.util.Log.d("MatchesScreen", "Stats null? ${fixture.stats == null}")
+    android.util.Log.d("MatchesScreen", "Stats size: ${fixture.stats?.size ?: 0}")
+    fixture.stats?.forEach { stat ->
+        android.util.Log.d("MatchesScreen", "Stat: ${stat.identifier}, h: ${stat.h.size}, a: ${stat.a.size}")
+    }
+    
     Dialog(onDismissRequest = onDismiss) {
         Card(
             shape = RoundedCornerShape(16.dp),
@@ -319,12 +330,132 @@ fun FixtureDetailDialog(
                 InfoRow("Away Difficulty", "${fixture.teamADifficulty}/5")
                 
                 Spacer(modifier = Modifier.height(16.dp))
+                Divider()
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Match Statistics Section
+                if (fixture.stats != null && fixture.stats.isNotEmpty()) {
+                    Text(
+                        "Match Statistics",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(bottom = 12.dp)
+                    )
+                    
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f, fill = false)
+                            .heightIn(max = 400.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        items(fixture.stats) { stat ->
+                            if (stat.h.isNotEmpty() || stat.a.isNotEmpty()) {
+                                val statName = when(stat.identifier) {
+                                    "goals_scored" -> "⚽ Goals"
+                                    "assists" -> "🅰️ Assists"
+                                    "own_goals" -> "Own Goals"
+                                    "penalties_saved" -> "Penalties Saved"
+                                    "penalties_missed" -> "Penalties Missed"
+                                    "yellow_cards" -> "🟨 Yellow Cards"
+                                    "red_cards" -> "🟥 Red Cards"
+                                    "saves" -> "🧤 Saves"
+                                    "bonus" -> "⭐ Bonus Points"
+                                    "bps" -> "BPS"
+                                    else -> stat.identifier.replace("_", " ").replaceFirstChar { it.uppercase() }
+                                }
+                                
+                                Card(
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = Color(0xFFF5F5F5)
+                                    ),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Column(
+                                        modifier = Modifier.padding(12.dp)
+                                    ) {
+                                        Text(
+                                            statName,
+                                            fontSize = 14.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.padding(bottom = 8.dp)
+                                        )
+                                        
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween
+                                        ) {
+                                            // Home Team Stats
+                                            Column(
+                                                modifier = Modifier.weight(1f),
+                                                horizontalAlignment = Alignment.Start
+                                            ) {
+                                                if (stat.h.isEmpty()) {
+                                                    Text(
+                                                        "-",
+                                                        fontSize = 12.sp,
+                                                        color = Color.Gray
+                                                    )
+                                                } else {
+                                                    stat.h.forEach { value ->
+                                                        val player = players.find { it.id == value.element }
+                                                        Text(
+                                                            "${player?.webName ?: "Unknown"} (${value.value})",
+                                                            fontSize = 12.sp,
+                                                            color = Color.Black
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                            
+                                            // Away Team Stats
+                                            Column(
+                                                modifier = Modifier.weight(1f),
+                                                horizontalAlignment = Alignment.End
+                                            ) {
+                                                if (stat.a.isEmpty()) {
+                                                    Text(
+                                                        "-",
+                                                        fontSize = 12.sp,
+                                                        color = Color.Gray
+                                                    )
+                                                } else {
+                                                    stat.a.forEach { value ->
+                                                        val player = players.find { it.id == value.element }
+                                                        Text(
+                                                            "${player?.webName ?: "Unknown"} (${value.value})",
+                                                            fontSize = 12.sp,
+                                                            color = Color.Black
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    
+                    Spacer(modifier = Modifier.height(16.dp))
+                } else if (fixture.finished) {
+                    Text(
+                        "No detailed stats available for this match",
+                        color = Color.Gray,
+                        fontSize = 14.sp,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                }
                 
                 Button(
                     onClick = onDismiss,
                     modifier = Modifier.fillMaxWidth(),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFF37003C)
+                        containerColor = MaterialTheme.colorScheme.primary
                     )
                 ) {
                     Text("Close")

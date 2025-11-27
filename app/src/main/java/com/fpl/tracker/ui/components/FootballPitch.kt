@@ -298,7 +298,7 @@ fun PlayerCardOnPitch(
                 modifier = Modifier
                     .size(20.dp)
                     .background(
-                        color = if (isCaptain) Color(0xFF37003C) else Color(0xFF666666),
+                        color = if (isCaptain) MaterialTheme.colorScheme.primary else Color(0xFF666666),
                         shape = CircleShape
                     ),
                 contentAlignment = Alignment.Center
@@ -471,6 +471,7 @@ fun PlayerCardOnPitch(
 }
 
 // Simple team color mapping (you can enhance this with more teams)
+@Composable
 fun getTeamColor(teamId: Int): Color {
     return when (teamId) {
         1 -> Color(0xFFEF0107) // Arsenal - Red
@@ -493,7 +494,7 @@ fun getTeamColor(teamId: Int): Color {
         18 -> Color(0xFF132257) // Tottenham - Navy
         19 -> Color(0xFF7A263A) // West Ham - Claret
         20 -> Color(0xFFFDB913) // Wolves - Gold
-        else -> Color(0xFF37003C) // Default FPL Purple
+        else -> MaterialTheme.colorScheme.primary // Default FPL Purple
     }
 }
 

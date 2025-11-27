@@ -17,6 +17,18 @@ data class Fixture(
     @SerializedName("team_h") val teamH: Int,
     @SerializedName("team_h_score") val teamHScore: Int?,
     @SerializedName("team_a_difficulty") val teamADifficulty: Int,
-    @SerializedName("team_h_difficulty") val teamHDifficulty: Int
+    @SerializedName("team_h_difficulty") val teamHDifficulty: Int,
+    val stats: List<FixtureStat>?
+)
+
+data class FixtureStat(
+    val identifier: String,
+    val a: List<FixtureStatValue>,
+    val h: List<FixtureStatValue>
+)
+
+data class FixtureStatValue(
+    val value: Int,
+    val element: Int
 )
 
