@@ -241,7 +241,7 @@ fun LeagueTableHeader() {
             modifier = Modifier.width(35.dp)
         )
         Text(
-            "Captain",
+            "Team",
             color = Color.White,
             fontWeight = FontWeight.Bold,
             fontSize = 12.sp,
@@ -340,7 +340,7 @@ fun EnhancedStandingRow(
             }
         }
         
-        // Captain (Team name + Manager)
+        // Team name and Captain
         Column(
             modifier = Modifier.weight(1.5f)
         ) {
@@ -352,12 +352,18 @@ fun EnhancedStandingRow(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
+            
+            // Show captain if available, otherwise show manager name
+            val captainText = liveData?.captainName?.let { "(C) $it" } ?: standing.playerName
+            val captainColor = if (liveData?.captainName != null) Color(0xFF00FF87) else Color.Gray
+            
             Text(
-                text = standing.playerName,
-                color = Color.Gray,
+                text = captainText,
+                color = captainColor,
                 fontSize = 11.sp,
                 maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+                overflow = TextOverflow.Ellipsis,
+                fontWeight = if (liveData?.captainName != null) FontWeight.Bold else FontWeight.Normal
             )
         }
         

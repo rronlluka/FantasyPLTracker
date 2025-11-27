@@ -20,7 +20,9 @@ data class ManagerLiveData(
     val inPlay: Int,
     val toStart: Int,
     val livePoints: Int = 0,  // Points from players currently playing
-    val totalLivePoints: Int = 0  // GW points + live points
+    val totalLivePoints: Int = 0,  // GW points + live points
+    val captainName: String? = null,  // Captain player name
+    val viceCaptainName: String? = null  // Vice captain player name
 )
 
 data class LeagueStandingsUiState(
@@ -253,6 +255,16 @@ class LeagueStandingsViewModel : ViewModel() {
                                     // Calculate FULL starting XI points (not just live games)
                                     var calculatedGwPoints = 0
                                     
+                                    // Find captain and vice captain
+                                    val captainPick = picks.picks.find { it.isCaptain }
+                                    val viceCaptainPick = picks.picks.find { it.isViceCaptain }
+                                    val captainPlayer = captainPick?.let { pick ->
+                                        bootstrap.elements.find { it.id == pick.element }
+                                    }
+                                    val viceCaptainPlayer = viceCaptainPick?.let { pick ->
+                                        bootstrap.elements.find { it.id == pick.element }
+                                    }
+                                    
                                     effectiveXI.forEach { playerId ->
                                         val player = bootstrap.elements.find { it.id == playerId }
                                         if (player != null) {
@@ -308,7 +320,15 @@ class LeagueStandingsViewModel : ViewModel() {
                                     val totalLivePoints = standing.total + livePointsDiff
                                     
                                     Log.d("LeagueStandings", "Manager ${standing.entryName}: InPlay=$inPlay, ToStart=$toStart, GWPts=$finalGwPoints, Total=$totalLivePoints")
-                                    ManagerLiveData(standing.entry, inPlay, toStart, livePointsDiff, totalLivePoints)
+                                    ManagerLiveData(
+                                        managerId = standing.entry,
+                                        inPlay = inPlay,
+                                        toStart = toStart,
+                                        livePoints = livePointsDiff,
+                                        totalLivePoints = totalLivePoints,
+                                        captainName = captainPlayer?.webName,
+                                        viceCaptainName = viceCaptainPlayer?.webName
+                                    )
                                 } else {
                                     ManagerLiveData(standing.entry, 0, 0, 0, standing.eventTotal)
                                 }

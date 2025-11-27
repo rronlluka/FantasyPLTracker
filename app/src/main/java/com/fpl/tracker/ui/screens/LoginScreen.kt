@@ -80,7 +80,7 @@ fun LoginScreen(navController: NavController) {
                     text = "FPL GAMEWEEK",
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color(0xFF37003C)
+                    color = MaterialTheme.colorScheme.primary
                 )
             }
         }
@@ -120,7 +120,7 @@ fun LoginScreen(navController: NavController) {
                     text = "Sign In",
                     fontSize = 24.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color(0xFF37003C),
+                    color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.padding(bottom = 16.dp)
                 )
                 
@@ -138,10 +138,108 @@ fun LoginScreen(navController: NavController) {
                         .padding(bottom = 8.dp),
                     singleLine = true,
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = Color(0xFF37003C),
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
                         unfocusedBorderColor = Color.LightGray
                     )
                 )
+                
+                // Help section
+                var showHelp by remember { mutableStateOf(false) }
+                
+                TextButton(
+                    onClick = { showHelp = !showHelp },
+                    modifier = Modifier.padding(bottom = 8.dp)
+                ) {
+                    Text(
+                        text = if (showHelp) "Hide instructions ▲" else "How to find your Manager ID? ▼",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                
+                if (showHelp) {
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 16.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = Color(0xFFF5F5F5)
+                        )
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(12.dp)
+                        ) {
+                            Text(
+                                "Finding Your Manager ID:",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.sp,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.padding(bottom = 8.dp)
+                            )
+                            
+                            Text(
+                                "1. Go to fantasy.premierleague.com",
+                                fontSize = 12.sp,
+                                modifier = Modifier.padding(bottom = 4.dp)
+                            )
+                            
+                            Text(
+                                "2. Click on 'Points' or 'Transfers'",
+                                fontSize = 12.sp,
+                                modifier = Modifier.padding(bottom = 4.dp)
+                            )
+                            
+                            Text(
+                                "3. Look at the URL in your browser",
+                                fontSize = 12.sp,
+                                modifier = Modifier.padding(bottom = 4.dp)
+                            )
+                            
+                            Text(
+                                "4. Your ID is the number in the URL:",
+                                fontSize = 12.sp,
+                                modifier = Modifier.padding(bottom = 4.dp)
+                            )
+                            
+                            Card(
+                                colors = CardDefaults.cardColors(
+                                    containerColor = Color.White
+                                ),
+                                modifier = Modifier.padding(vertical = 4.dp)
+                            ) {
+                                Column(modifier = Modifier.padding(8.dp)) {
+                                    Text(
+                                        "fantasy.premierleague.com/entry/",
+                                        fontSize = 11.sp,
+                                        color = Color.Gray,
+                                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                                    )
+                                    Text(
+                                        "685991",
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                                    )
+                                    Text(
+                                        "/event/12",
+                                        fontSize = 11.sp,
+                                        color = Color.Gray,
+                                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                                    )
+                                }
+                            }
+                            
+                            Text(
+                                "↑ This number (685991) is your Manager ID",
+                                fontSize = 11.sp,
+                                color = Color.Gray,
+                                fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
+                            )
+                        }
+                    }
+                }
                 
                 if (showError) {
                     Text(
@@ -169,7 +267,7 @@ fun LoginScreen(navController: NavController) {
                         .fillMaxWidth()
                         .height(56.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFF37003C)
+                        containerColor = MaterialTheme.colorScheme.primary
                     ),
                     shape = RoundedCornerShape(8.dp)
                 ) {
