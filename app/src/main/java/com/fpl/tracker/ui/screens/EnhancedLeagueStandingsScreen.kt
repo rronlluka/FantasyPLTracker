@@ -25,6 +25,8 @@ import com.fpl.tracker.data.models.RankChange
 import com.fpl.tracker.data.models.StandingEntry
 import com.fpl.tracker.data.preferences.PreferencesManager
 import com.fpl.tracker.navigation.Screen
+import com.fpl.tracker.ui.theme.CelestialPurple
+import com.fpl.tracker.ui.theme.FrostedLilac
 import com.fpl.tracker.viewmodel.LeagueStandingsViewModel
 import com.fpl.tracker.viewmodel.ManagerLiveData
 
@@ -50,21 +52,21 @@ fun EnhancedLeagueStandingsScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { 
-                    Text(
-                        text = uiState.leagueStandings?.league?.name ?: "League",
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
-                    }
-                },
-                actions = {
-                    // Favorite button
+                TopAppBar(
+                    title = { 
+                        Text(
+                            text = uiState.leagueStandings?.league?.name ?: "League",
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    },
+                    navigationIcon = {
+                        IconButton(onClick = { navController.popBackStack() }) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
+                        }
+                    },
+                    actions = {
+                        // Favorite button
                     IconButton(onClick = {
                         if (isFavorite) {
                             prefsManager.removeFavoriteLeague()
@@ -91,10 +93,10 @@ fun EnhancedLeagueStandingsScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color(0xFF37003C),
-                    titleContentColor = Color.White,
-                    navigationIconContentColor = Color.White,
-                    actionIconContentColor = Color.White
+                    containerColor = CelestialPurple,
+                    titleContentColor = FrostedLilac,
+                    navigationIconContentColor = FrostedLilac,
+                    actionIconContentColor = FrostedLilac
                 )
             )
         }
@@ -184,7 +186,8 @@ fun EnhancedLeagueStandingsScreen(
                                     navController.navigate(
                                         Screen.ManagerFormation.createRoute(
                                             standing.entry.toLong(),
-                                            uiState.currentEvent
+                                            uiState.currentEvent,
+                                            standing.entryName.ifBlank { standing.playerName }
                                         )
                                     )
                                 }
@@ -460,4 +463,3 @@ fun EnhancedStandingRow(
     
     Divider(color = Color(0xFF2D2D2D), thickness = 1.dp)
 }
-

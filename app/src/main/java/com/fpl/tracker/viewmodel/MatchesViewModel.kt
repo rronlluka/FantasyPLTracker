@@ -3,10 +3,7 @@ package com.fpl.tracker.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.fpl.tracker.data.api.RetrofitInstance
-import com.fpl.tracker.data.models.Fixture
-import com.fpl.tracker.data.models.LiveElement
-import com.fpl.tracker.data.models.Player
-import com.fpl.tracker.data.models.Team
+import com.fpl.tracker.data.models.*
 import com.fpl.tracker.data.repository.FPLRepository
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -22,6 +19,7 @@ data class MatchesUiState(
     val players: List<Player> = emptyList(),
     val liveElements: List<LiveElement> = emptyList(),
     val currentEvent: Int = 1,
+    val events: List<Event> = emptyList(),
     val error: String? = null,
     val hasLiveGames: Boolean = false
 )
@@ -53,40 +51,25 @@ class MatchesViewModel : ViewModel() {
             val teams = bootstrap.teams
             val players = bootstrap.elements
 
-            val fixturesResult = repository.getFixturesByEvent(currentEvent)
-            val fixtures = fixturesResult.getOrNull()
-
-            if (fixtures == null) {
-                _uiState.value = _uiState.value.copy(
-                    isLoading = false,
-                    error = fixturesResult.exceptionOrNull()?.message ?: "Failed to load fixtures"
-                )
-                return@launch
-            }
-
-            val hasLiveGames = fixtures.any { it.started == true && !it.finished }
-
-            // Fetch live data if any games are in progress
-            val liveElements = if (hasLiveGames || fixtures.any { it.started == true }) {
-                repository.getLiveGameweek(currentEvent).getOrNull()?.elements ?: emptyList()
-            } else {
-                emptyList()
-            }
+            val events = bootstrap.events
+            val defaultEvent = events.find { it.isCurrent }?.id ?: events.lastOrNull()?.id ?: 1
 
             _uiState.value = _uiState.value.copy(
-                isLoading = false,
-                fixtures = fixtures,
+                events = events,
                 teams = teams,
-                players = players,
-                liveElements = liveElements,
-                currentEvent = currentEvent,
-                hasLiveGames = hasLiveGames
+                players = players
             )
 
-            // Start auto-refresh if there are live games
-            if (hasLiveGames) {
-                startLiveRefresh(currentEvent)
-            }
+            loadFixturesForEvent(defaultEvent)
+        }
+    }
+
+    fun selectGameweek(eventId: Int) {
+        if (_uiState.value.currentEvent == eventId) return
+        liveRefreshJob?.cancel()
+        liveRefreshJob = null
+        viewModelScope.launch {
+            loadFixturesForEvent(eventId)
         }
     }
 
@@ -100,28 +83,75 @@ class MatchesViewModel : ViewModel() {
         }
     }
 
-    private suspend fun refreshLiveData(eventId: Int) {
+    private suspend fun loadFixturesForEvent(eventId: Int) {
+        _uiState.value = _uiState.value.copy(isLoading = true, error = null)
+
         val fixturesResult = repository.getFixturesByEvent(eventId)
-        val fixtures = fixturesResult.getOrNull() ?: return
+        val fixtures = fixturesResult.getOrNull()
+
+        if (fixtures == null) {
+            _uiState.value = _uiState.value.copy(
+                isLoading = false,
+                error = fixturesResult.exceptionOrNull()?.message ?: "Failed to load fixtures"
+            )
+            return
+        }
 
         val hasLiveGames = fixtures.any { it.started == true && !it.finished }
-
         val liveElements = if (hasLiveGames || fixtures.any { it.started == true }) {
             repository.getLiveGameweek(eventId).getOrNull()?.elements ?: emptyList()
         } else {
             emptyList()
         }
 
+        liveRefreshJob?.cancel()
+        liveRefreshJob = null
+
         _uiState.value = _uiState.value.copy(
+            isLoading = false,
             fixtures = fixtures,
             liveElements = liveElements,
+            currentEvent = eventId,
             hasLiveGames = hasLiveGames
         )
 
-        // Stop refresh loop if no more live games
-        if (!hasLiveGames) {
-            liveRefreshJob?.cancel()
-            liveRefreshJob = null
+        if (hasLiveGames) {
+            startLiveRefresh(eventId)
+        }
+    }
+
+    private suspend fun refreshLiveData(eventId: Int) {
+        val fixturesResult = repository.getFixturesByEvent(eventId)
+        val fixtures = fixturesResult.getOrNull()
+
+        if (fixtures == null) {
+            _uiState.value = _uiState.value.copy(
+                isLoading = false,
+                error = fixturesResult.exceptionOrNull()?.message ?: "Failed to load fixtures"
+            )
+            return
+        }
+
+        val hasLiveGames = fixtures.any { it.started == true && !it.finished }
+        val liveElements = if (hasLiveGames || fixtures.any { it.started == true }) {
+            repository.getLiveGameweek(eventId).getOrNull()?.elements ?: emptyList()
+        } else {
+            emptyList()
+        }
+
+        liveRefreshJob?.cancel()
+        liveRefreshJob = null
+
+        _uiState.value = _uiState.value.copy(
+            isLoading = false,
+            fixtures = fixtures,
+            liveElements = liveElements,
+            currentEvent = eventId,
+            hasLiveGames = hasLiveGames
+        )
+
+        if (hasLiveGames) {
+            startLiveRefresh(eventId)
         }
     }
 
@@ -129,7 +159,9 @@ class MatchesViewModel : ViewModel() {
         val currentEvent = _uiState.value.currentEvent
         liveRefreshJob?.cancel()
         liveRefreshJob = null
-        loadCurrentGameweekFixtures()
+        viewModelScope.launch {
+            loadFixturesForEvent(currentEvent)
+        }
     }
 
     override fun onCleared() {

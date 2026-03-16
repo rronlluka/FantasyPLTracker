@@ -27,6 +27,7 @@ data class PlayerWithDetails(
 data class ManagerFormationUiState(
     val isLoading: Boolean = false,
     val managerPicks: ManagerPicks? = null,
+    val managerHistory: ManagerHistory? = null,
     val bootstrapData: BootstrapData? = null,
     val liveGameweek: LiveGameweek? = null,
     val fixtures: List<Fixture> = emptyList(),
@@ -50,6 +51,8 @@ class ManagerFormationViewModel : ViewModel() {
             
             // Load manager picks
             val picksResult = repository.getManagerPicks(managerId, eventId)
+            // Load manager history for chips
+            val historyResult = repository.getManagerHistory(managerId)
             
             // Load live gameweek data
             val liveResult = repository.getLiveGameweek(eventId)
@@ -172,6 +175,7 @@ class ManagerFormationViewModel : ViewModel() {
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
                     managerPicks = picks,
+                    managerHistory = historyResult.getOrNull(),
                     bootstrapData = bootstrap,
                     liveGameweek = live,
                     fixtures = fixtures,
@@ -182,4 +186,3 @@ class ManagerFormationViewModel : ViewModel() {
         }
     }
 }
-

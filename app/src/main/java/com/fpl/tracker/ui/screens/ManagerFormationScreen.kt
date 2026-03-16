@@ -28,6 +28,11 @@ import com.fpl.tracker.data.api.RetrofitInstance
 import com.fpl.tracker.data.repository.FPLRepository
 import com.fpl.tracker.ui.components.FootballPitch
 import com.fpl.tracker.ui.components.PlayerDetailDialog
+import com.fpl.tracker.ui.theme.AuroraTeal
+import com.fpl.tracker.ui.theme.CelestialPurple
+import com.fpl.tracker.ui.theme.EmberRed
+import com.fpl.tracker.ui.theme.FrostedLilac
+import com.fpl.tracker.ui.theme.SolarGold
 import com.fpl.tracker.viewmodel.ManagerFormationViewModel
 import com.fpl.tracker.viewmodel.PlayerWithDetails
 import com.fpl.tracker.viewmodel.LeagueStandingsViewModel
@@ -41,6 +46,7 @@ fun ManagerFormationScreen(
     navController: NavController,
     managerId: Long,
     eventId: Int,
+    teamName: String,
     viewModel: ManagerFormationViewModel = viewModel()
 ) {
     val context = LocalContext.current
@@ -56,6 +62,7 @@ fun ManagerFormationScreen(
     var isPitchView by remember { mutableStateOf(true) }
     val scope = rememberCoroutineScope()
     val repository = remember { FPLRepository(RetrofitInstance.api) }
+    val formationTitle = teamName.takeIf { it.isNotBlank() } ?: "Team Formation"
     
     LaunchedEffect(managerId, eventId) {
         viewModel.loadManagerFormation(managerId, eventId)
@@ -64,40 +71,30 @@ fun ManagerFormationScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Team Formation - GW$eventId") },
+                title = {
+                    Column {
+                        Text(
+                            text = formationTitle,
+                            style = MaterialTheme.typography.titleLarge,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            color = FrostedLilac
+                        )
+                        Text(
+                            text = "GW$eventId",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = FrostedLilac.copy(alpha = 0.8f)
+                        )
+                    }
+                },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
                     }
                 },
-                actions = {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(end = 8.dp)
-                    ) {
-                        Text(
-                            text = if (isPitchView) "Pitch" else "List",
-                            color = MaterialTheme.colorScheme.onPrimary,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Medium
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Switch(
-                            checked = isPitchView,
-                            onCheckedChange = { isPitchView = it },
-                            colors = SwitchDefaults.colors(
-                                checkedThumbColor = Color.White,
-                                checkedTrackColor = Color(0xFF00FF87),
-                                uncheckedThumbColor = Color.White,
-                                uncheckedTrackColor = Color.White.copy(alpha = 0.4f)
-                            ),
-                            modifier = Modifier.height(24.dp)
-                        )
-                    }
-                },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimary
+                    containerColor = CelestialPurple,
+                    titleContentColor = FrostedLilac
                 )
             )
         }
@@ -151,7 +148,7 @@ fun ManagerFormationScreen(
                             modifier = Modifier.fillMaxWidth(),
                             elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
                             colors = CardDefaults.cardColors(
-                                containerColor = Color(0xFF37003C)
+                                containerColor = MaterialTheme.colorScheme.secondaryContainer
                             )
                         ) {
                             // Calculate live points - sum up starting XI with live/just finished games
@@ -201,7 +198,7 @@ fun ManagerFormationScreen(
                                     Spacer(modifier = Modifier.height(8.dp))
                                     Text(
                                         text = "🔴 Live: +$livePoints pts from ${startingXI.count { it.isLive }} players",
-                                        color = Color(0xFF00FF87),
+                                        color = MaterialTheme.colorScheme.primary,
                                         fontSize = 12.sp,
                                         modifier = Modifier.align(Alignment.CenterHorizontally)
                                     )
@@ -247,11 +244,39 @@ fun ManagerFormationScreen(
                         }
 
                         // Starting XI - Pitch View or List View
-                        Text(
-                            text = "Starting XI",
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold
-                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = "Starting XI",
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = if (isPitchView) "Pitch" else "List",
+                                    color = FrostedLilac,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Switch(
+                                    checked = isPitchView,
+                                    onCheckedChange = { isPitchView = it },
+                                    colors = SwitchDefaults.colors(
+                                        checkedThumbColor = FrostedLilac,
+                                        checkedTrackColor = AuroraTeal.copy(alpha = 0.65f),
+                                        uncheckedThumbColor = FrostedLilac.copy(alpha = 0.7f),
+                                        uncheckedTrackColor = FrostedLilac.copy(alpha = 0.3f)
+                                    ),
+                                    modifier = Modifier.height(24.dp)
+                                )
+                            }
+                        }
 
                         // Shared click handler for player clicks
                         val handlePlayerClick: (PlayerWithDetails) -> Unit = { playerWithDetails ->
@@ -360,12 +385,12 @@ fun ManagerFormationScreen(
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(Color.Black.copy(alpha = 0.5f)),
+                        .background(MaterialTheme.colorScheme.onBackground.copy(alpha = 0.45f)),
                     contentAlignment = Alignment.Center
                 ) {
                     Card(
                         colors = CardDefaults.cardColors(
-                            containerColor = Color.White
+                            containerColor = MaterialTheme.colorScheme.surface
                         ),
                         shape = RoundedCornerShape(16.dp)
                     ) {
@@ -374,7 +399,7 @@ fun ManagerFormationScreen(
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             CircularProgressIndicator(
-                                color = Color(0xFF37003C)
+                                color = MaterialTheme.colorScheme.primary
                             )
                             Spacer(modifier = Modifier.height(16.dp))
                             Text(
@@ -386,7 +411,7 @@ fun ManagerFormationScreen(
                             Text(
                                 selectedPlayer?.player?.webName ?: "",
                                 fontSize = 14.sp,
-                                color = Color.Gray
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
@@ -403,6 +428,7 @@ fun ManagerFormationScreen(
                     bootstrapData = uiState.bootstrapData,
                     currentEvent = eventId,
                     liveStats = selectedPlayer!!.liveStats,
+                    chipsUsed = uiState.managerHistory?.chips,
                     onDismiss = {
                         showPlayerDialog = false
                         selectedPlayer = null
@@ -427,14 +453,17 @@ fun StatItem(
         Text(
             text = label,
             style = MaterialTheme.typography.bodySmall,
-            color = if (highlighted) Color.White.copy(alpha = 0.7f) else Color.White.copy(alpha = 0.6f)
+            color = if (highlighted)
+                MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.85f)
+            else
+                MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.6f)
         )
         Spacer(modifier = Modifier.height(4.dp))
         Text(
             text = value,
             style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.Bold,
-            color = if (highlighted) Color(0xFF00FF87) else Color.White
+            color = if (highlighted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSecondaryContainer
         )
     }
 }
@@ -537,7 +566,7 @@ fun BenchPlayerCard(
                     Text(
                         text = "${if (isHome) "vs" else "@"} ${opponent.shortName}",
                         fontSize = 8.sp,
-                        color = Color.Gray,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -578,7 +607,7 @@ fun PlayerCard(playerDetail: PlayerWithDetails) {
                         Box(
                             modifier = Modifier
                                 .size(24.dp)
-                                .background(Color(0xFF37003C), CircleShape),
+                                .background(Color(0xFF00FF87), CircleShape),
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
@@ -592,7 +621,7 @@ fun PlayerCard(playerDetail: PlayerWithDetails) {
                         Box(
                             modifier = Modifier
                                 .size(24.dp)
-                                .background(Color(0xFF888888), CircleShape),
+                                .background(MaterialTheme.colorScheme.onSurfaceVariant, CircleShape),
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
@@ -624,9 +653,11 @@ fun PlayerCard(playerDetail: PlayerWithDetails) {
                 modifier = Modifier
                     .size(48.dp)
                     .background(
-                        color = if (points > 5) Color(0xFF00FF87).copy(alpha = 0.3f) 
-                               else if (points < 2) Color(0xFFFF4458).copy(alpha = 0.3f)
-                               else MaterialTheme.colorScheme.surfaceVariant,
+                        color = when {
+                            points > 5 -> MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)
+                            points < 2 -> EmberRed.copy(alpha = 0.3f)
+                            else -> MaterialTheme.colorScheme.surfaceVariant
+                        },
                         shape = CircleShape
                     ),
                 contentAlignment = Alignment.Center
@@ -670,14 +701,14 @@ fun PlayerListRow(
         if (isHome) it.teamHDifficulty else it.teamADifficulty
     } ?: 3
 
-    // Difficulty colours matched to FPL official palette
+    // Difficulty colours from the requested palette
     val diffColor = when (difficulty) {
         1 -> Color(0xFF257D5A)  // dark green
         2 -> Color(0xFF00FF87)  // bright green
         3 -> Color(0xFFE7E7E7)  // light grey/white
         4 -> Color(0xFFFF4455)  // red/pink
         5 -> Color(0xFF80072D)  // dark maroon
-        else -> Color.Gray
+        else -> MaterialTheme.colorScheme.onSurfaceVariant
     }
 
     // Status label
@@ -687,15 +718,15 @@ fun PlayerListRow(
     when {
         fixture == null -> {
             statusText = "No fix"
-            statusColor = Color.Gray
+            statusColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
         }
         fixture.finished -> {
             statusText = "Done"
-            statusColor = Color(0xFF9E9E9E)
+            statusColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
         }
         fixture.started == true -> {
             statusText = "${fixture.minutes}'"
-            statusColor = Color(0xFF00E676)
+            statusColor = AuroraTeal
         }
         fixture.kickoffTime != null -> {
             // Parse kickoff time to show e.g. "Sat 15:00"
@@ -709,11 +740,11 @@ fun PlayerListRow(
                 fixture.kickoffTime.take(10)
             }
             statusText = kTime
-            statusColor = MaterialTheme.colorScheme.onSurfaceVariant
+            statusColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
         }
         else -> {
             statusText = "TBC"
-            statusColor = Color.Gray
+            statusColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
         }
     }
 
@@ -749,7 +780,7 @@ fun PlayerListRow(
                         modifier = Modifier
                             .size(17.dp)
                             .background(
-                                if (isCaptain) Color(0xFF37003C) else Color(0xFF888888),
+                                if (isCaptain) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                                 CircleShape
                             ),
                         contentAlignment = Alignment.Center
@@ -772,7 +803,7 @@ fun PlayerListRow(
             playerDetail.opponentTeam?.let { opponent ->
                 val oppShort = opponent.shortName.take(3).uppercase()
                 val venueLabel = if (isHome) "H" else "A"
-                val textColor = if (difficulty == 3) Color(0xFF333333) else Color.White
+                val textColor = if (difficulty == 3) Color(0xFF111111) else Color.White
                 Box(
                     modifier = Modifier
                         .background(diffColor, RoundedCornerShape(6.dp))
@@ -807,9 +838,9 @@ fun PlayerListRow(
                     .size(40.dp)
                     .background(
                         color = when {
-                            displayPoints >= 10 -> Color(0xFF00FF87).copy(alpha = 0.22f)
-                            displayPoints >= 6  -> Color(0xFF4CAF50).copy(alpha = 0.18f)
-                            displayPoints <= 2  -> Color(0xFFFF4458).copy(alpha = 0.18f)
+                            displayPoints >= 10 -> MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
+                            displayPoints >= 6  -> MaterialTheme.colorScheme.secondary.copy(alpha = 0.2f)
+                            displayPoints <= 2  -> EmberRed.copy(alpha = 0.2f)
                             else -> MaterialTheme.colorScheme.surfaceVariant
                         },
                         shape = CircleShape
@@ -826,4 +857,3 @@ fun PlayerListRow(
         }
     }
 }
-

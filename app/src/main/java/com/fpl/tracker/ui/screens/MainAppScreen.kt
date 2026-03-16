@@ -15,6 +15,10 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.fpl.tracker.data.preferences.PreferencesManager
+import com.fpl.tracker.ui.theme.AuroraTeal
+import com.fpl.tracker.ui.theme.CelestialPurple
+import com.fpl.tracker.ui.theme.FrostedLilac
+import com.fpl.tracker.ui.theme.Starfield
 
 sealed class BottomNavItem(val route: String, val icon: ImageVector, val label: String) {
     object Leagues : BottomNavItem("leagues", Icons.Filled.EmojiEvents, "Leagues")
@@ -46,7 +50,7 @@ fun MainAppScreen(mainNavController: NavController) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("FPL Tracker") },
+                title = { Text("FPL Tracker", color = FrostedLilac) },
                 actions = {
                     IconButton(onClick = {
                         prefsManager.clearAll()
@@ -58,16 +62,16 @@ fun MainAppScreen(mainNavController: NavController) {
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimary,
-                    actionIconContentColor = MaterialTheme.colorScheme.onPrimary
+                    containerColor = CelestialPurple,
+                    titleContentColor = FrostedLilac,
+                    actionIconContentColor = FrostedLilac
                 )
             )
         },
         bottomBar = {
             NavigationBar(
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary
+                containerColor = Starfield,
+                contentColor = FrostedLilac
             ) {
                 val items = listOf(
                     BottomNavItem.Leagues,
@@ -90,11 +94,11 @@ fun MainAppScreen(mainNavController: NavController) {
                             }
                         },
                         colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = MaterialTheme.colorScheme.secondary,
-                            selectedTextColor = MaterialTheme.colorScheme.secondary,
-                            unselectedIconColor = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.6f),
-                            unselectedTextColor = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.6f),
-                            indicatorColor = MaterialTheme.colorScheme.primary
+                            selectedIconColor = AuroraTeal,
+                            selectedTextColor = AuroraTeal,
+                            unselectedIconColor = FrostedLilac.copy(alpha = 0.6f),
+                            unselectedTextColor = FrostedLilac.copy(alpha = 0.6f),
+                            indicatorColor = CelestialPurple.copy(alpha = 0.25f)
                         )
                     )
                 }
@@ -118,4 +122,3 @@ fun MainAppScreen(mainNavController: NavController) {
         }
     }
 }
-

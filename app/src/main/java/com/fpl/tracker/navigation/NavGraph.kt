@@ -1,5 +1,6 @@
 package com.fpl.tracker.navigation
 
+import android.net.Uri
 import androidx.compose.runtime.Composable
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
@@ -18,8 +19,9 @@ sealed class Screen(val route: String) {
     object LeagueStandings : Screen("league_standings/{leagueId}") {
         fun createRoute(leagueId: Long) = "league_standings/$leagueId"
     }
-    object ManagerFormation : Screen("manager_formation/{managerId}/{eventId}") {
-        fun createRoute(managerId: Long, eventId: Int) = "manager_formation/$managerId/$eventId"
+    object ManagerFormation : Screen("manager_formation/{managerId}/{eventId}/{teamName}") {
+        fun createRoute(managerId: Long, eventId: Int, teamName: String) =
+            "manager_formation/$managerId/$eventId/${Uri.encode(teamName)}"
     }
 }
 
@@ -64,13 +66,18 @@ fun NavGraph(
             route = Screen.ManagerFormation.route,
             arguments = listOf(
                 navArgument("managerId") { type = NavType.LongType },
-                navArgument("eventId") { type = NavType.IntType }
+                navArgument("eventId") { type = NavType.IntType },
+                navArgument("teamName") {
+                    type = NavType.StringType
+                    defaultValue = "Team Formation"
+                }
             )
         ) { backStackEntry ->
             val managerId = backStackEntry.arguments?.getLong("managerId") ?: 0L
             val eventId = backStackEntry.arguments?.getInt("eventId") ?: 1
-            ManagerFormationScreen(navController, managerId, eventId)
+            val rawTeamName = backStackEntry.arguments?.getString("teamName") ?: "Team Formation"
+            val decodedTeamName = Uri.decode(rawTeamName).takeIf { it.isNotBlank() } ?: "Team Formation"
+            ManagerFormationScreen(navController, managerId, eventId, decodedTeamName)
         }
     }
 }
-

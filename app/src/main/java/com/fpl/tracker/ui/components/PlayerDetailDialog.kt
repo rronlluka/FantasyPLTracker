@@ -3,7 +3,9 @@ package com.fpl.tracker.ui.components
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
@@ -14,6 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -29,6 +32,7 @@ fun PlayerDetailDialog(
     bootstrapData: BootstrapData?,
     currentEvent: Int,
     liveStats: LiveElement? = null,
+    chipsUsed: List<ChipUsage>? = null,
     onDismiss: () -> Unit
 ) {
     var selectedTabIndex by remember { mutableIntStateOf(0) }
@@ -126,7 +130,16 @@ fun PlayerDetailDialog(
                 // Content based on selected tab
                 Box(modifier = Modifier.weight(1f)) {
                     when (selectedTabIndex) {
-                        0 -> SummaryTab(player, team, playerDetail, leagueStats, bootstrapData, currentEvent, liveStats)
+                        0 -> SummaryTab(
+                            player,
+                            team,
+                            playerDetail,
+                            leagueStats,
+                            bootstrapData,
+                            currentEvent,
+                            liveStats,
+                            chipsUsed
+                        )
                         1 -> StartsTab(leagueStats)
                         2 -> BenchTab(leagueStats)
                     }
@@ -157,7 +170,8 @@ fun SummaryTab(
     leagueStats: LeaguePlayerStats?,
     bootstrapData: BootstrapData?,
     currentEvent: Int,
-    liveStats: LiveElement? = null
+    liveStats: LiveElement? = null,
+    chipsUsed: List<ChipUsage>? = null
 ) {
     LazyColumn(
         modifier = Modifier
@@ -173,6 +187,63 @@ fun SummaryTab(
                     android.util.Log.d("PlayerDialog", "Fixture ${explain.fixture}:")
                     explain.stats.forEach { stat ->
                         android.util.Log.d("PlayerDialog", "  - identifier: ${stat.identifier}, value: ${stat.value}, points: ${stat.points}")
+                    }
+                }
+            }
+        }
+
+        // Chips summary
+        item {
+            Column(
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = "Chips used",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                val chips = chipsUsed.orEmpty()
+                if (chips.isEmpty()) {
+                    Text(
+                        text = "None activated yet",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                } else {
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(chips) { chip ->
+                            Card(
+                                modifier = Modifier
+                                    .defaultMinSize(minWidth = 120.dp),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = MaterialTheme.colorScheme.secondaryContainer
+                                )
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(12.dp),
+                                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Text(
+                                        chip.name,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Text(
+                                        text = "GW${chip.event}",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Text(
+                                        text = chip.time,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -729,4 +800,3 @@ fun getPositionName(elementType: Int): String {
         else -> "Player"
     }
 }
-

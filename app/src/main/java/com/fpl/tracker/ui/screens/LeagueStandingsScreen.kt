@@ -16,6 +16,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.fpl.tracker.data.models.StandingEntry
 import com.fpl.tracker.navigation.Screen
+import com.fpl.tracker.ui.theme.CelestialPurple
+import com.fpl.tracker.ui.theme.FrostedLilac
 import com.fpl.tracker.viewmodel.LeagueStandingsViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -41,8 +43,8 @@ fun LeagueStandingsScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimary
+                    containerColor = CelestialPurple,
+                    titleContentColor = FrostedLilac
                 )
             )
         }
@@ -151,7 +153,11 @@ fun LeagueStandingsScreen(
                                 standing = standing,
                                 onClick = {
                                     navController.navigate(
-                                        Screen.ManagerFormation.createRoute(standing.entry.toLong(), uiState.currentEvent)
+                                        Screen.ManagerFormation.createRoute(
+                                            standing.entry.toLong(),
+                                            uiState.currentEvent,
+                                            standing.entryName.ifBlank { standing.playerName }
+                                        )
                                     )
                                 }
                             )
@@ -219,4 +225,3 @@ fun StandingCard(standing: StandingEntry, onClick: () -> Unit) {
         }
     }
 }
-

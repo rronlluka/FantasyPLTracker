@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material3.*
@@ -21,6 +20,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.fpl.tracker.data.preferences.PreferencesManager
 import com.fpl.tracker.navigation.Screen
+import com.fpl.tracker.ui.theme.CelestialPurple
+import com.fpl.tracker.ui.theme.FrostedLilac
 import com.fpl.tracker.viewmodel.ManagerStatsViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -40,25 +41,7 @@ fun ManagerStatsScreen(
         viewModel.loadManagerData(managerId)
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Manager Stats") },
-                navigationIcon = {
-                    IconButton(onClick = { 
-                        prefsManager.clearAll()
-                        navController.popBackStack()
-                    }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimary
-                )
-            )
-        }
-    ) { paddingValues ->
+    Scaffold { paddingValues ->
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -89,15 +72,17 @@ fun ManagerStatsScreen(
                 }
                 uiState.managerData != null -> {
                     val managerData = uiState.managerData!!
+                    val ownerTeamName = managerData.name.takeIf { it.isNotBlank() }
+                        ?: "${managerData.playerFirstName} ${managerData.playerLastName}"
                     val managerHistory = uiState.managerHistory
                     val bootstrapData = uiState.bootstrapData
                     val currentEvent = bootstrapData?.events?.find { it.isCurrent }?.id ?: 1
 
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
                         // Manager Info Card
                         item {
                             Card(
@@ -244,14 +229,18 @@ fun ManagerStatsScreen(
 
                         // View Team Button
                         item {
-                            Button(
-                                onClick = {
-                                    navController.navigate(
-                                        Screen.ManagerFormation.createRoute(managerId, currentEvent)
+                        Button(
+                            onClick = {
+                                navController.navigate(
+                                    Screen.ManagerFormation.createRoute(
+                                        managerId,
+                                        currentEvent,
+                                        ownerTeamName
                                     )
-                                },
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
+                                )
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
                                 Text("View Current Team")
                             }
                         }
@@ -433,4 +422,3 @@ fun StatsRow(
         )
     }
 }
-

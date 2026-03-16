@@ -32,15 +32,14 @@ import com.fpl.tracker.data.models.Fixture
 import com.fpl.tracker.data.models.LiveElement
 import com.fpl.tracker.data.models.Player
 import com.fpl.tracker.data.models.Team
+import com.fpl.tracker.ui.theme.CelestialPurple
+import com.fpl.tracker.ui.theme.FrostedLilac
 import com.fpl.tracker.viewmodel.MatchesViewModel
 
 // FPL brand colours
-private val FplPurple = Color(0xFF37003C)
+private val FplPurple = CelestialPurple
 private val FplGreen = Color(0xFF00FF87)
 private val FplLiveRed = Color(0xFFE90052)
-private val FplLiveBg = Color(0xFFFFF0F3)
-private val FplFinishedBg = Color(0xFFF9FAFB)
-private val FplUpcomingBg = Color(0xFFFFFFFF)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -55,110 +54,140 @@ fun MatchesScreen(
         viewModel.loadCurrentGameweekFixtures()
     }
 
+    val dropdownExpanded = remember { mutableStateOf(false) }
+    val events = uiState.events
+    val selectedEvent = events.firstOrNull { it.id == uiState.currentEvent }
+
     Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text(
-                            text = "Gameweek ${uiState.currentEvent}",
-                            fontSize = 20.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
-                        )
-                        if (uiState.hasLiveGames) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                LiveDot()
-                                Spacer(Modifier.width(4.dp))
-                                Text(
-                                    "Live",
-                                    fontSize = 12.sp,
-                                    color = FplGreen
-                                )
-                            }
-                        }
-                    }
-                },
-                actions = {
-                    IconButton(onClick = { viewModel.refreshFixtures() }) {
-                        Icon(
-                            Icons.Default.Refresh,
-                            contentDescription = "Refresh",
-                            tint = Color.White
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = FplPurple)
-            )
-        },
-        containerColor = Color(0xFFF2F3F5)
+        containerColor = MaterialTheme.colorScheme.background
     ) { padding ->
-        Box(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
+                .background(MaterialTheme.colorScheme.background)
+                .padding(horizontal = 16.dp, vertical = 6.dp)
         ) {
-            when {
-                uiState.isLoading -> {
-                    CircularProgressIndicator(
-                        modifier = Modifier.align(Alignment.Center),
-                        color = FplPurple
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                ExposedDropdownMenuBox(
+                    expanded = dropdownExpanded.value,
+                    onExpandedChange = { dropdownExpanded.value = !dropdownExpanded.value },
+                    modifier = Modifier.weight(1f)
+                ) {
+                    TextField(
+                        value = selectedEvent?.name ?: "Gameweek ${uiState.currentEvent}",
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Gameweek") },
+                        trailingIcon = {
+                            ExposedDropdownMenuDefaults.TrailingIcon(dropdownExpanded.value)
+                        },
+                        colors = TextFieldDefaults.colors(
+                            focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                            focusedIndicatorColor = Color.Transparent,
+                            unfocusedIndicatorColor = Color.Transparent,
+                            focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                            unfocusedTextColor = MaterialTheme.colorScheme.onSurface
+                        ),
+                        modifier = Modifier.menuAnchor()
                     )
-                }
-
-                uiState.error != null -> {
-                    Column(
-                        modifier = Modifier
-                            .align(Alignment.Center)
-                            .padding(24.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
+                    ExposedDropdownMenu(
+                        expanded = dropdownExpanded.value,
+                        onDismissRequest = { dropdownExpanded.value = false }
                     ) {
-                        Text(
-                            text = "⚠️ Failed to load fixtures",
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = FplPurple
-                        )
-                        Spacer(Modifier.height(8.dp))
-                        Text(
-                            text = uiState.error ?: "",
-                            fontSize = 13.sp,
-                            color = Color.Gray,
-                            textAlign = TextAlign.Center
-                        )
-                        Spacer(Modifier.height(16.dp))
-                        Button(
-                            onClick = { viewModel.refreshFixtures() },
-                            colors = ButtonDefaults.buttonColors(containerColor = FplPurple)
-                        ) {
-                            Text("Retry", color = Color.White)
-                        }
-                    }
-                }
-
-                uiState.fixtures.isNotEmpty() -> {
-                    LazyColumn(
-                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        items(uiState.fixtures) { fixture ->
-                            FixtureCard(
-                                fixture = fixture,
-                                homeTeam = uiState.teams.find { it.id == fixture.teamH },
-                                awayTeam = uiState.teams.find { it.id == fixture.teamA },
-                                liveElements = uiState.liveElements,
-                                onClick = { selectedFixture = fixture }
+                        events.forEach { event ->
+                            DropdownMenuItem(
+                                text = { Text(event.name) },
+                                onClick = {
+                                    dropdownExpanded.value = false
+                                    viewModel.selectGameweek(event.id)
+                                }
                             )
                         }
                     }
                 }
-
-                else -> {
-                    Text(
-                        "No fixtures found",
-                        modifier = Modifier.align(Alignment.Center),
-                        color = Color.Gray
+                IconButton(onClick = { viewModel.refreshFixtures() }) {
+                    Icon(
+                        Icons.Default.Refresh,
+                        contentDescription = "Refresh",
+                        tint = FrostedLilac
                     )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+            ) {
+                when {
+                    uiState.isLoading -> {
+                        CircularProgressIndicator(
+                            modifier = Modifier.align(Alignment.Center),
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                    uiState.error != null -> {
+                        Column(
+                            modifier = Modifier
+                                .align(Alignment.Center)
+                                .padding(24.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(
+                                text = "⚠️ Failed to load fixtures",
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Spacer(Modifier.height(8.dp))
+                            Text(
+                                text = uiState.error ?: "",
+                                fontSize = 13.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                textAlign = TextAlign.Center
+                            )
+                            Spacer(Modifier.height(16.dp))
+                            Button(
+                                onClick = { viewModel.refreshFixtures() },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.primary
+                                )
+                            ) {
+                                Text("Retry", color = MaterialTheme.colorScheme.onPrimary)
+                            }
+                        }
+                    }
+                    uiState.fixtures.isNotEmpty() -> {
+                        LazyColumn(
+                            modifier = Modifier.fillMaxSize(),
+                            contentPadding = PaddingValues(bottom = 16.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            items(uiState.fixtures) { fixture ->
+                                FixtureCard(
+                                    fixture = fixture,
+                                    homeTeam = uiState.teams.find { it.id == fixture.teamH },
+                                    awayTeam = uiState.teams.find { it.id == fixture.teamA },
+                                    liveElements = uiState.liveElements,
+                                    onClick = { selectedFixture = fixture }
+                                )
+                            }
+                        }
+                    }
+                    else -> {
+                        Text(
+                            "No fixtures found",
+                            modifier = Modifier.align(Alignment.Center),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
             }
         }
@@ -195,11 +224,7 @@ fun FixtureCard(
     val homeScore = fixture.teamHScore
     val awayScore = fixture.teamAScore
 
-    val cardBg = when {
-        isLive -> FplLiveBg
-        isFinished -> FplFinishedBg
-        else -> FplUpcomingBg
-    }
+    val cardBg = MaterialTheme.colorScheme.surfaceVariant
 
     Card(
         modifier = Modifier
@@ -262,7 +287,7 @@ fun FixtureCard(
                             text = "${homeScore ?: 0}  –  ${awayScore ?: 0}",
                             fontSize = 22.sp,
                             fontWeight = FontWeight.ExtraBold,
-                            color = FplPurple
+                            color = MaterialTheme.colorScheme.primary
                         )
                     }
                     isFinished -> {
@@ -270,26 +295,26 @@ fun FixtureCard(
                             text = "${homeScore ?: 0}  –  ${awayScore ?: 0}",
                             fontSize = 22.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color(0xFF333333)
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
                             text = "FT",
                             fontSize = 11.sp,
-                            color = Color.Gray
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                     else -> {
                         Text(
                             text = "vs",
                             fontSize = 15.sp,
-                            color = Color.Gray
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         fixture.kickoffTime?.let { kt ->
                             val time = kt.substringAfter("T").take(5)
                             Text(
                                 text = time,
                                 fontSize = 12.sp,
-                                color = Color.Gray
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
@@ -336,10 +361,24 @@ private fun TeamBlock(
             text = name,
             fontSize = 14.sp,
             fontWeight = FontWeight.SemiBold,
-            color = FplPurple,
+            color = MaterialTheme.colorScheme.primary,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
+        Text(
+            text = shortName,
+            fontSize = 11.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        if (showScore && score != null) {
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = score.toString(),
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+        }
     }
 }
 
@@ -461,7 +500,12 @@ fun FixtureDetailDialog(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(if (isLive) FplLiveBg else Color(0xFFF8F8F8))
+                .background(
+                    if (isLive)
+                        MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
+                    else
+                        MaterialTheme.colorScheme.surfaceVariant
+                )
                         .padding(vertical = 20.dp, horizontal = 16.dp)
                 ) {
                     Row(
@@ -937,7 +981,7 @@ private fun SectionHeader(title: String) {
         text = title,
         fontSize = 15.sp,
         fontWeight = FontWeight.Bold,
-        color = FplPurple,
+        color = MaterialTheme.colorScheme.primary,
         modifier = Modifier.padding(bottom = 4.dp)
     )
 }
