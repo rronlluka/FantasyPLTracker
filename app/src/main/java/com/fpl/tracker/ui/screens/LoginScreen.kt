@@ -108,13 +108,13 @@ fun LoginScreen(navController: NavController) {
             modifier = Modifier.padding(top = 16.dp, bottom = 8.dp)
         )
 
-        Text(
-            text = "A darker, high-contrast home for your Fantasy Premier League data—sign in and stay live with every transfer, rank and hit.",
-            fontSize = 16.sp,
-            color = FrostedLilac.copy(alpha = 0.85f),
-            textAlign = TextAlign.Center,
-            modifier = Modifier.padding(bottom = 32.dp)
-        )
+//        Text(
+//            text = "A darker, high-contrast home for your Fantasy Premier League data—sign in and stay live with every transfer, rank and hit.",
+//            fontSize = 16.sp,
+//            color = FrostedLilac.copy(alpha = 0.85f),
+//            textAlign = TextAlign.Center,
+//            modifier = Modifier.padding(bottom = 32.dp)
+//        )
 
         // Login Card
         Card(
