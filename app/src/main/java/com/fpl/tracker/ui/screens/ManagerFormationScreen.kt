@@ -53,6 +53,7 @@ fun ManagerFormationScreen(
     var playerDetail by remember { mutableStateOf<com.fpl.tracker.data.models.PlayerDetailResponse?>(null) }
     var leagueStats by remember { mutableStateOf<com.fpl.tracker.data.models.LeaguePlayerStats?>(null) }
     var isLoadingPlayerData by remember { mutableStateOf(false) }
+    var isPitchView by remember { mutableStateOf(true) }
     val scope = rememberCoroutineScope()
     val repository = remember { FPLRepository(RetrofitInstance.api) }
     
@@ -67,6 +68,31 @@ fun ManagerFormationScreen(
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
+                    }
+                },
+                actions = {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(end = 8.dp)
+                    ) {
+                        Text(
+                            text = if (isPitchView) "Pitch" else "List",
+                            color = MaterialTheme.colorScheme.onPrimary,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Switch(
+                            checked = isPitchView,
+                            onCheckedChange = { isPitchView = it },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = Color.White,
+                                checkedTrackColor = Color(0xFF00FF87),
+                                uncheckedThumbColor = Color.White,
+                                uncheckedTrackColor = Color.White.copy(alpha = 0.4f)
+                            ),
+                            modifier = Modifier.height(24.dp)
+                        )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -220,73 +246,77 @@ fun ManagerFormationScreen(
                             }
                         }
 
-                        // Football Pitch View
+                        // Starting XI - Pitch View or List View
                         Text(
                             text = "Starting XI",
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold
                         )
-                        
-                        FootballPitch(
-                            startingXI = startingXI,
-                            provisionalBonus = uiState.provisionalBonus,
-                            onPlayerClick = { playerWithDetails ->
-                                selectedPlayer = playerWithDetails
-                                isLoadingPlayerData = true
-                                
-                                // Load ALL data before showing dialog
-                                scope.launch {
-                                    try {
-                                        Log.d("PlayerDialog", "Loading data for player: ${playerWithDetails.player.webName}")
-                                        
-                                        // Load player detail
-                                        val detailResult = repository.getPlayerDetail(playerWithDetails.player.id)
-                                        val detail = detailResult.getOrNull()
-                                        Log.d("PlayerDialog", "Player detail loaded: ${detail != null}")
-                                        
-                                        // Load league stats if we have a saved league
-                                        var stats: com.fpl.tracker.data.models.LeaguePlayerStats? = null
-                                        val savedLeagueId = prefsManager.getLeagueId()
-                                        if (savedLeagueId != null && uiState.bootstrapData != null) {
-                                            Log.d("PlayerDialog", "Loading league stats for league: $savedLeagueId")
-                                            
-                                            // Get league standings
-                                            val leagueResult = repository.getLeagueStandings(savedLeagueId)
-                                            val leagueStandings = leagueResult.getOrNull()
-                                            
-                                            if (leagueStandings != null) {
-                                                Log.d("PlayerDialog", "League standings loaded, calculating stats...")
-                                                
-                                                // Calculate league-specific stats
-                                                stats = leagueViewModel.calculateLeaguePlayerStats(
-                                                    playerId = playerWithDetails.player.id,
-                                                    leagueStandings = leagueStandings,
-                                                    currentEvent = eventId,
-                                                    bootstrapData = uiState.bootstrapData!!
-                                                )
-                                                
-                                                Log.d("PlayerDialog", "Stats calculated - Starts: ${stats.startsCount}, Bench: ${stats.benchCount}, Captain: ${stats.captainCount}")
-                                            } else {
-                                                Log.d("PlayerDialog", "Failed to load league standings")
-                                            }
+
+                        // Shared click handler for player clicks
+                        val handlePlayerClick: (PlayerWithDetails) -> Unit = { playerWithDetails ->
+                            selectedPlayer = playerWithDetails
+                            isLoadingPlayerData = true
+                            scope.launch {
+                                try {
+                                    Log.d("PlayerDialog", "Loading data for player: ${playerWithDetails.player.webName}")
+                                    val detailResult = repository.getPlayerDetail(playerWithDetails.player.id)
+                                    val detail = detailResult.getOrNull()
+                                    Log.d("PlayerDialog", "Player detail loaded: ${detail != null}")
+                                    var stats: com.fpl.tracker.data.models.LeaguePlayerStats? = null
+                                    val savedLeagueId = prefsManager.getLeagueId()
+                                    if (savedLeagueId != null && uiState.bootstrapData != null) {
+                                        Log.d("PlayerDialog", "Loading league stats for league: $savedLeagueId")
+                                        val leagueResult = repository.getLeagueStandings(savedLeagueId)
+                                        val leagueStandings = leagueResult.getOrNull()
+                                        if (leagueStandings != null) {
+                                            Log.d("PlayerDialog", "League standings loaded, calculating stats...")
+                                            stats = leagueViewModel.calculateLeaguePlayerStats(
+                                                playerId = playerWithDetails.player.id,
+                                                leagueStandings = leagueStandings,
+                                                currentEvent = eventId,
+                                                bootstrapData = uiState.bootstrapData!!
+                                            )
+                                            Log.d("PlayerDialog", "Stats calculated - Starts: ${stats.startsCount}, Bench: ${stats.benchCount}, Captain: ${stats.captainCount}")
                                         } else {
-                                            Log.d("PlayerDialog", "No saved league ID or bootstrap data not loaded")
+                                            Log.d("PlayerDialog", "Failed to load league standings")
                                         }
-                                        
-                                        // Only show dialog after ALL data is loaded
-                                        playerDetail = detail
-                                        leagueStats = stats
-                                        isLoadingPlayerData = false
-                                        showPlayerDialog = true
-                                        
-                                    } catch (e: Exception) {
-                                        Log.e("PlayerDialog", "Error loading player data: ${e.message}")
-                                        isLoadingPlayerData = false
+                                    } else {
+                                        Log.d("PlayerDialog", "No saved league ID or bootstrap data not loaded")
                                     }
+                                    playerDetail = detail
+                                    leagueStats = stats
+                                    isLoadingPlayerData = false
+                                    showPlayerDialog = true
+                                } catch (e: Exception) {
+                                    Log.e("PlayerDialog", "Error loading player data: ${e.message}")
+                                    isLoadingPlayerData = false
                                 }
-                            },
-                            modifier = Modifier.fillMaxWidth()
-                        )
+                            }
+                        }
+
+                        if (isPitchView) {
+                            FootballPitch(
+                                startingXI = startingXI,
+                                provisionalBonus = uiState.provisionalBonus,
+                                onPlayerClick = handlePlayerClick,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        } else {
+                            // List View
+                            Column(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                startingXI.forEach { playerWithDetails ->
+                                    PlayerListRow(
+                                        playerDetail = playerWithDetails,
+                                        provisionalBonus = uiState.provisionalBonus,
+                                        onPlayerClick = handlePlayerClick
+                                    )
+                                }
+                            }
+                        }
 
                         // Bench Section
                         Text(
@@ -316,43 +346,7 @@ fun ManagerFormationScreen(
                                                 else -> "SUB"
                                             }
                                         }",
-                                        onPlayerClick = { clickedPlayer ->
-                                            selectedPlayer = clickedPlayer
-                                            isLoadingPlayerData = true
-                                            
-                                            // Load ALL data before showing dialog
-                                            scope.launch {
-                                                try {
-                                                    val detailResult = repository.getPlayerDetail(clickedPlayer.player.id)
-                                                    val detail = detailResult.getOrNull()
-                                                    
-                                                    var stats: com.fpl.tracker.data.models.LeaguePlayerStats? = null
-                                                    val savedLeagueId = prefsManager.getLeagueId()
-                                                    if (savedLeagueId != null && uiState.bootstrapData != null) {
-                                                        val leagueResult = repository.getLeagueStandings(savedLeagueId)
-                                                        val leagueStandings = leagueResult.getOrNull()
-                                                        
-                                                        if (leagueStandings != null) {
-                                                            stats = leagueViewModel.calculateLeaguePlayerStats(
-                                                                playerId = clickedPlayer.player.id,
-                                                                leagueStandings = leagueStandings,
-                                                                currentEvent = eventId,
-                                                                bootstrapData = uiState.bootstrapData!!
-                                                            )
-                                                        }
-                                                    }
-                                                    
-                                                    // Only show dialog after ALL data is loaded
-                                                    playerDetail = detail
-                                                    leagueStats = stats
-                                                    isLoadingPlayerData = false
-                                                    showPlayerDialog = true
-                                                    
-                                                } catch (e: Exception) {
-                                                    isLoadingPlayerData = false
-                                                }
-                                            }
-                                        }
+                                        onPlayerClick = handlePlayerClick
                                     )
                                 }
                             }
@@ -640,6 +634,191 @@ fun PlayerCard(playerDetail: PlayerWithDetails) {
                 Text(
                     text = "${points * playerDetail.pick.multiplier}",
                     style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun PlayerListRow(
+    playerDetail: PlayerWithDetails,
+    provisionalBonus: Map<Int, Int> = emptyMap(),
+    onPlayerClick: ((PlayerWithDetails) -> Unit)? = null
+) {
+    val isCaptain = playerDetail.pick.isCaptain
+    val isViceCaptain = playerDetail.pick.isViceCaptain
+
+    var points = if (playerDetail.hasLivePoints && playerDetail.liveStats != null) {
+        playerDetail.liveStats.stats.totalPoints
+    } else {
+        playerDetail.player.eventPoints
+    }
+    if (playerDetail.hasLivePoints && playerDetail.liveStats != null) {
+        val currentBonus = playerDetail.liveStats.stats.bonus
+        val provisionalBonusPoints = provisionalBonus[playerDetail.player.id] ?: 0
+        if (currentBonus == 0 && provisionalBonusPoints > 0) {
+            points += provisionalBonusPoints
+        }
+    }
+    val displayPoints = points * playerDetail.pick.multiplier
+
+    val isHome = playerDetail.fixture?.teamH == playerDetail.team.id
+    val difficulty = playerDetail.fixture?.let {
+        if (isHome) it.teamHDifficulty else it.teamADifficulty
+    } ?: 3
+
+    // Difficulty colours matched to FPL official palette
+    val diffColor = when (difficulty) {
+        1 -> Color(0xFF257D5A)  // dark green
+        2 -> Color(0xFF00FF87)  // bright green
+        3 -> Color(0xFFE7E7E7)  // light grey/white
+        4 -> Color(0xFFFF4455)  // red/pink
+        5 -> Color(0xFF80072D)  // dark maroon
+        else -> Color.Gray
+    }
+
+    // Status label
+    val fixture = playerDetail.fixture
+    val statusText: String
+    val statusColor: Color
+    when {
+        fixture == null -> {
+            statusText = "No fix"
+            statusColor = Color.Gray
+        }
+        fixture.finished -> {
+            statusText = "Done"
+            statusColor = Color(0xFF9E9E9E)
+        }
+        fixture.started == true -> {
+            statusText = "${fixture.minutes}'"
+            statusColor = Color(0xFF00E676)
+        }
+        fixture.kickoffTime != null -> {
+            // Parse kickoff time to show e.g. "Sat 15:00"
+            val kTime = try {
+                val instant = java.time.Instant.parse(fixture.kickoffTime)
+                val zdt = instant.atZone(java.time.ZoneId.systemDefault())
+                val dayAbbrev = zdt.dayOfWeek.getDisplayName(java.time.format.TextStyle.SHORT, java.util.Locale.getDefault())
+                val time = "%02d:%02d".format(zdt.hour, zdt.minute)
+                "$dayAbbrev $time"
+            } catch (e: Exception) {
+                fixture.kickoffTime.take(10)
+            }
+            statusText = kTime
+            statusColor = MaterialTheme.colorScheme.onSurfaceVariant
+        }
+        else -> {
+            statusText = "TBC"
+            statusColor = Color.Gray
+        }
+    }
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(if (onPlayerClick != null) Modifier.clickable { onPlayerClick(playerDetail) } else Modifier),
+        shape = RoundedCornerShape(8.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // ── Player name + C/V badge ──────────────────────────────────
+            Row(
+                modifier = Modifier.weight(1f),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = playerDetail.player.webName,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                if (isCaptain || isViceCaptain) {
+                    Spacer(modifier = Modifier.width(5.dp))
+                    Box(
+                        modifier = Modifier
+                            .size(17.dp)
+                            .background(
+                                if (isCaptain) Color(0xFF37003C) else Color(0xFF888888),
+                                CircleShape
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = if (isCaptain) "C" else "V",
+                            color = Color.White,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+                if (playerDetail.isLive) {
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(text = "🔴", fontSize = 10.sp)
+                }
+            }
+
+            // ── Opponent chip: "ARS H" with diff colour ──────────────────
+            playerDetail.opponentTeam?.let { opponent ->
+                val oppShort = opponent.shortName.take(3).uppercase()
+                val venueLabel = if (isHome) "H" else "A"
+                val textColor = if (difficulty == 3) Color(0xFF333333) else Color.White
+                Box(
+                    modifier = Modifier
+                        .background(diffColor, RoundedCornerShape(6.dp))
+                        .padding(horizontal = 7.dp, vertical = 3.dp)
+                ) {
+                    Text(
+                        text = "$oppShort $venueLabel",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = textColor
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.width(10.dp))
+
+            // ── Status ───────────────────────────────────────────────────
+            Text(
+                text = statusText,
+                fontSize = 12.sp,
+                color = statusColor,
+                fontWeight = if (fixture?.started == true && fixture.finished.not()) FontWeight.Bold else FontWeight.Normal,
+                modifier = Modifier.width(56.dp),
+                textAlign = TextAlign.Center
+            )
+
+            Spacer(modifier = Modifier.width(8.dp))
+
+            // ── Points badge ─────────────────────────────────────────────
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .background(
+                        color = when {
+                            displayPoints >= 10 -> Color(0xFF00FF87).copy(alpha = 0.22f)
+                            displayPoints >= 6  -> Color(0xFF4CAF50).copy(alpha = 0.18f)
+                            displayPoints <= 2  -> Color(0xFFFF4458).copy(alpha = 0.18f)
+                            else -> MaterialTheme.colorScheme.surfaceVariant
+                        },
+                        shape = CircleShape
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "$displayPoints",
+                    fontSize = 15.sp,
                     fontWeight = FontWeight.Bold,
                     textAlign = TextAlign.Center
                 )
