@@ -77,7 +77,7 @@ fun LoginScreen(navController: NavController) {
                     fontSize = 48.sp
                 )
                 Text(
-                    text = "FPL GAMEWEEK",
+                    text = "FPL LIVE TRACKER",
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary
