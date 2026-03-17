@@ -39,10 +39,12 @@ data class LeagueStandingsUiState(
     val isLoading: Boolean = false,
     val leagueStandings: LeagueStandings? = null,
     val currentEvent: Int = 1,
+    val selectedGameweek: Int? = null,       // null = live/current view; non-null = historical
+    val availableGameweeks: List<Int> = emptyList(),
     val managerLiveData: Map<Int, ManagerLiveData> = emptyMap(),
     val liveRankings: List<StandingEntry> = emptyList(),
     val hasLiveFixtures: Boolean = false,
-    val showChipHistory: Boolean = false,  // Toggle between normal view and chip history view
+    val showChipHistory: Boolean = false,
     val error: String? = null
 )
 
@@ -52,8 +54,21 @@ class LeagueStandingsViewModel : ViewModel() {
     private val _uiState = MutableStateFlow(LeagueStandingsUiState())
     val uiState: StateFlow<LeagueStandingsUiState> = _uiState.asStateFlow()
 
+    // Remember the league ID so selectGameweek() can reload without needing it passed in again
+    private var storedLeagueId: Long = 0L
+
     fun toggleChipHistory() {
         _uiState.value = _uiState.value.copy(showChipHistory = !_uiState.value.showChipHistory)
+    }
+
+    /** Called when the user picks a GW from the dropdown. */
+    fun selectGameweek(gw: Int) {
+        loadLeagueStandings(storedLeagueId, selectedEventId = gw)
+    }
+
+    /** Resets to the live/current-GW view. */
+    fun clearGameweekSelection() {
+        loadLeagueStandings(storedLeagueId, selectedEventId = null)
     }
 
     /** Converts a raw chip name from the FPL API into its numbered UsedChip object. */
@@ -131,15 +146,20 @@ class LeagueStandingsViewModel : ViewModel() {
         )
     }
     
-    fun loadLeagueStandings(leagueId: Long) {
+    fun loadLeagueStandings(leagueId: Long, selectedEventId: Int? = null) {
+        storedLeagueId = leagueId
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
-            
+
             // Load bootstrap to get current event
             val bootstrapResult = repository.getBootstrapData()
             val currentEvent = bootstrapResult.getOrNull()?.events?.find { it.isCurrent }?.id ?: 1
-            
-            val result = repository.getLeagueStandings(leagueId)
+            val availableGameweeks = (1..currentEvent).toList()
+
+            // Clamp selected GW to valid range
+            val clampedGw = selectedEventId?.coerceIn(1, currentEvent)
+
+            val result = repository.getLeagueStandings(leagueId, eventId = clampedGw)
             
             if (result.isFailure) {
                 _uiState.value = _uiState.value.copy(
@@ -148,7 +168,73 @@ class LeagueStandingsViewModel : ViewModel() {
                 )
             } else {
                 val leagueStandings = result.getOrNull()!!
-                
+                val isHistoricalView = clampedGw != null && clampedGw != currentEvent
+
+                // ── Historical GW path ────────────────────────────────────────────────────
+                // The API standings endpoint doesn't return per-GW correct pts/totals.
+                // We fetch every manager's history in parallel to get the exact
+                // `points` (GW pts that week) and `totalPoints` (cumulative up to that GW),
+                // then re-rank so the table is fully accurate for the chosen GW.
+                if (isHistoricalView) {
+                    val targetGw = clampedGw!!
+
+                    // Fetch history for all managers in the league concurrently
+                    val historicalEntries = leagueStandings.standings.results
+                        .map { standing ->
+                            async {
+                                try {
+                                    val hist = repository.getManagerHistory(standing.entry.toLong()).getOrNull()
+                                    val gwData = hist?.current?.find { it.event == targetGw }
+                                    // Preserve existing allChips from already-loaded managerLiveData if available
+                                    val existingChips = _uiState.value.managerLiveData[standing.entry]?.allChips
+                                        ?: buildUsedChips(hist?.chips)
+                                    Triple(standing, gwData, existingChips)
+                                } catch (e: Exception) {
+                                    Triple(standing, null, emptyList<UsedChip>())
+                                }
+                            }
+                        }.awaitAll()
+
+                    // Build corrected StandingEntry list sorted by cumulative total at that GW
+                    var rank = 0
+                    val correctedRankings = historicalEntries
+                        .sortedByDescending { (_, gwData, _) -> gwData?.totalPoints ?: 0 }
+                        .mapIndexed { index, (standing, gwData, chips) ->
+                            rank = index + 1
+                            // Overwrite eventTotal and total with historically correct values
+                            val correctedEntry = standing.copy(
+                                eventTotal = gwData?.points ?: 0,
+                                total      = gwData?.totalPoints ?: 0,
+                                rank       = rank,
+                                lastRank   = rank   // no prev-rank context for historical, keep neutral
+                            )
+                            // Merge chip history into existing managerLiveData (or create minimal entry)
+                            val updatedLiveData = (_uiState.value.managerLiveData[standing.entry]
+                                ?: ManagerLiveData(standing.entry, 0, 0)).copy(allChips = chips)
+                            Pair(correctedEntry, updatedLiveData)
+                        }
+
+                    val correctedStandings = correctedRankings.map { it.first }
+                    val updatedLiveDataMap = _uiState.value.managerLiveData.toMutableMap().also { map ->
+                        correctedRankings.forEach { (_, liveData) -> map[liveData.managerId] = liveData }
+                    }
+
+                    _uiState.value = _uiState.value.copy(
+                        isLoading          = false,
+                        leagueStandings    = leagueStandings,
+                        currentEvent       = currentEvent,
+                        selectedGameweek   = targetGw,
+                        availableGameweeks = availableGameweeks,
+                        managerLiveData    = updatedLiveDataMap,
+                        liveRankings       = correctedStandings,  // Screen uses this list when non-empty
+                        hasLiveFixtures    = false,
+                        showChipHistory    = _uiState.value.showChipHistory
+                    )
+                    return@launch
+                }
+
+                // ── Live / current-GW path below ──────────────────────────────────────────
+
                 // Load fixtures for current gameweek
                 val fixturesResult = repository.getFixturesByEvent(currentEvent)
                 val fixtures = fixturesResult.getOrNull() ?: emptyList()
@@ -430,9 +516,11 @@ class LeagueStandingsViewModel : ViewModel() {
                     isLoading = false,
                     leagueStandings = leagueStandings,
                     currentEvent = currentEvent,
+                    selectedGameweek = null,          // Live view = no selection
+                    availableGameweeks = availableGameweeks,
                     managerLiveData = managerLiveDataMap,
                     liveRankings = liveRankings,
-                    hasLiveFixtures = liveFixtures.isNotEmpty()  // Only true when games are truly live
+                    hasLiveFixtures = liveFixtures.isNotEmpty()
                 )
             }
         }

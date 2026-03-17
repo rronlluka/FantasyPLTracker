@@ -72,9 +72,13 @@ class FPLRepository(private val api: FPLApiService) {
         }
     }
 
-    suspend fun getLeagueStandings(leagueId: Long, page: Int = 1): Result<LeagueStandings> = withContext(Dispatchers.IO) {
+    suspend fun getLeagueStandings(
+        leagueId: Long,
+        page: Int = 1,
+        eventId: Int? = null   // null = live/current, non-null = historical GW
+    ): Result<LeagueStandings> = withContext(Dispatchers.IO) {
         try {
-            val response = api.getLeagueStandings(leagueId, page)
+            val response = api.getLeagueStandings(leagueId, page, eventId)
             if (response.isSuccessful && response.body() != null) {
                 Result.success(response.body()!!)
             } else {

@@ -35,7 +35,8 @@ interface FPLApiService {
     @GET("leagues-classic/{league_id}/standings/")
     suspend fun getLeagueStandings(
         @Path("league_id") leagueId: Long,
-        @Query("page_standings") page: Int = 1
+        @Query("page_standings") page: Int = 1,
+        @Query("event") eventId: Int? = null  // Null = current GW; non-null = historical standings
     ): Response<LeagueStandings>
     
     @GET("element-summary/{element_id}/")
