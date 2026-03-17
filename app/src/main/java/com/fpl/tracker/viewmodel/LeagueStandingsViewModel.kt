@@ -15,16 +15,24 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
+/** Represents one chip usage: which chip, which GW, numbered within its type (1st or 2nd use). */
+data class UsedChip(
+    val name: String,   // "bboost", "wildcard", "3xc", "freehit"
+    val event: Int,
+    val number: Int     // 1 = first use of this chip type, 2 = second use
+)
+
 data class ManagerLiveData(
     val managerId: Int,
     val inPlay: Int,
     val toStart: Int,
-    val livePoints: Int = 0,  // Points from players currently playing
-    val totalLivePoints: Int = 0,  // GW points + live points
-    val captainName: String? = null,  // Captain player name
-    val viceCaptainName: String? = null,  // Vice captain player name
-    val activeChip: String? = null,  // Active chip: "bboost", "wildcard", "3xc", "freehit"
-    val chipNumber: Int = 1  // Whether this is the 1st or 2nd use of this chip type
+    val livePoints: Int = 0,
+    val totalLivePoints: Int = 0,
+    val captainName: String? = null,
+    val viceCaptainName: String? = null,
+    val activeChip: String? = null,
+    val chipNumber: Int = 1,
+    val allChips: List<UsedChip> = emptyList()  // Full chip history for the season
 )
 
 data class LeagueStandingsUiState(
@@ -33,15 +41,32 @@ data class LeagueStandingsUiState(
     val currentEvent: Int = 1,
     val managerLiveData: Map<Int, ManagerLiveData> = emptyMap(),
     val liveRankings: List<StandingEntry> = emptyList(),
-    val hasLiveFixtures: Boolean = false,  // True only when games are actually live (not just finished)
+    val hasLiveFixtures: Boolean = false,
+    val showChipHistory: Boolean = false,  // Toggle between normal view and chip history view
     val error: String? = null
 )
 
 class LeagueStandingsViewModel : ViewModel() {
     private val repository = FPLRepository(RetrofitInstance.api)
-    
+
     private val _uiState = MutableStateFlow(LeagueStandingsUiState())
     val uiState: StateFlow<LeagueStandingsUiState> = _uiState.asStateFlow()
+
+    fun toggleChipHistory() {
+        _uiState.value = _uiState.value.copy(showChipHistory = !_uiState.value.showChipHistory)
+    }
+
+    /** Converts a raw chip name from the FPL API into its numbered UsedChip object. */
+    private fun buildUsedChips(chips: List<ChipUsage>?): List<UsedChip> {
+        if (chips.isNullOrEmpty()) return emptyList()
+        // Count usages per type to assign number 1 / 2
+        val countByName = mutableMapOf<String, Int>()
+        return chips.sortedBy { it.event }.map { chip ->
+            val count = (countByName[chip.name] ?: 0) + 1
+            countByName[chip.name] = count
+            UsedChip(name = chip.name, event = chip.event, number = count)
+        }
+    }
 
     suspend fun calculateLeaguePlayerStats(
         playerId: Int,
@@ -246,22 +271,21 @@ class LeagueStandingsViewModel : ViewModel() {
                                 val activeChip = picks.activeChip  // e.g. "bboost", "3xc", "wildcard", "freehit"
                                 val isBenchBoost = activeChip == "bboost"
 
-                                // Determine chip number (1st or 2nd usage) via history
+                                // Always fetch history so we can show full chip history in the toggle view
                                 var chipNumber = 1
-                                Log.d("rronirroni", "$activeChip $bootstrap $isBenchBoost")
-                                if (activeChip != null) {
-                                    try {
-                                        val historyResult = repository.getManagerHistory(standing.entry.toLong())
-                                        val history = historyResult.getOrNull()
-                                        if (history != null) {
-                                            // Count how many times this chip type was used in total (including this GW)
-                                            val chipName = activeChip
-                                            val usages = history.chips?.count { it.name == chipName } ?: 1
+                                var allChips = emptyList<UsedChip>()
+                                try {
+                                    val historyResult = repository.getManagerHistory(standing.entry.toLong())
+                                    val history = historyResult.getOrNull()
+                                    if (history != null) {
+                                        allChips = buildUsedChips(history.chips)
+                                        if (activeChip != null) {
+                                            val usages = history.chips?.count { it.name == activeChip } ?: 1
                                             chipNumber = usages
                                         }
-                                    } catch (e: Exception) {
-                                        chipNumber = 1
                                     }
+                                } catch (e: Exception) {
+                                    chipNumber = 1
                                 }
 
                                 if (bootstrap != null) {
@@ -369,7 +393,8 @@ class LeagueStandingsViewModel : ViewModel() {
                                         captainName = captainPlayer?.webName,
                                         viceCaptainName = viceCaptainPlayer?.webName,
                                         activeChip = activeChip,
-                                        chipNumber = chipNumber
+                                        chipNumber = chipNumber,
+                                        allChips = allChips
                                     )
                                 } else {
                                     ManagerLiveData(standing.entry, 0, 0, 0, standing.eventTotal)
