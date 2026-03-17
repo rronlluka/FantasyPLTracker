@@ -90,6 +90,35 @@ object AutoSubstitutionHelper {
     }
     
     /**
+     * Counts how many players in a given list are in play and to start.
+     * Used for Bench Boost where all 15 players score.
+     */
+    fun countPlayersStatusForList(
+        playerIds: List<Int>,
+        players: List<Player>,
+        fixtures: List<Fixture>
+    ): Pair<Int, Int> {
+        var inPlay = 0
+        var toStart = 0
+
+        playerIds.forEach { playerId ->
+            val player = players.find { it.id == playerId }
+            if (player != null) {
+                val fixture = fixtures.find {
+                    it.teamH == player.team || it.teamA == player.team
+                }
+                val isFinished = fixture?.finished == true || fixture?.finishedProvisional == true
+                when {
+                    fixture?.started == true && !isFinished -> inPlay++
+                    fixture?.started == false -> toStart++
+                }
+            }
+        }
+
+        return Pair(inPlay, toStart)
+    }
+
+    /**
      * Counts how many players are in play and to start considering auto-subs
      */
     fun countPlayersStatus(

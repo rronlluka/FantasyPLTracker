@@ -22,7 +22,9 @@ data class ManagerLiveData(
     val livePoints: Int = 0,  // Points from players currently playing
     val totalLivePoints: Int = 0,  // GW points + live points
     val captainName: String? = null,  // Captain player name
-    val viceCaptainName: String? = null  // Vice captain player name
+    val viceCaptainName: String? = null,  // Vice captain player name
+    val activeChip: String? = null,  // Active chip: "bboost", "wildcard", "3xc", "freehit"
+    val chipNumber: Int = 1  // Whether this is the 1st or 2nd use of this chip type
 )
 
 data class LeagueStandingsUiState(
@@ -228,33 +230,72 @@ class LeagueStandingsViewModel : ViewModel() {
                 val managersToCheck = leagueStandings.standings.results.take(50)
                 val managerLiveDataMap = mutableMapOf<Int, ManagerLiveData>()
                 
+                // Build a chip-use-count map from ALL managers' history so we can label BB1/BB2 etc.
+                // We do this lazily per manager below using their picks activeChip field and history.
+                // Since we don't load history for all managers here, we'll detect chip number
+                // by fetching history only when we see an active chip (to keep it performant).
+
                 val deferredResults = managersToCheck.map { standing ->
                     async {
                         try {
                             val picksResult = repository.getManagerPicks(standing.entry.toLong(), currentEvent)
                             val picks = picksResult.getOrNull()
-                            
+
                             if (picks != null) {
                                 val bootstrap = bootstrapResult.getOrNull()
-                                
+                                val activeChip = picks.activeChip  // e.g. "bboost", "3xc", "wildcard", "freehit"
+                                val isBenchBoost = activeChip == "bboost"
+
+                                // Determine chip number (1st or 2nd usage) via history
+                                var chipNumber = 1
+                                Log.d("rronirroni", "$activeChip $bootstrap $isBenchBoost")
+                                if (activeChip != null) {
+                                    try {
+                                        val historyResult = repository.getManagerHistory(standing.entry.toLong())
+                                        val history = historyResult.getOrNull()
+                                        if (history != null) {
+                                            // Count how many times this chip type was used in total (including this GW)
+                                            val chipName = activeChip
+                                            val usages = history.chips?.count { it.name == chipName } ?: 1
+                                            chipNumber = usages
+                                        }
+                                    } catch (e: Exception) {
+                                        chipNumber = 1
+                                    }
+                                }
+
                                 if (bootstrap != null) {
-                                    // Use auto-substitution logic to count only effective playing XI
-                                    val (inPlay, toStart) = AutoSubstitutionHelper.countPlayersStatus(
-                                        picks = picks.picks,
-                                        players = bootstrap.elements,
-                                        fixtures = fixtures
-                                    )
-                                    
-                                    // Calculate live points from players currently playing
-                                    val effectiveXI = AutoSubstitutionHelper.getEffectivePlayingXI(
-                                        picks = picks.picks,
-                                        players = bootstrap.elements,
-                                        fixtures = fixtures
-                                    )
-                                    
-                                    // Calculate FULL starting XI points (not just live games)
+                                    // For Bench Boost: all 15 players score. Use all picks.
+                                    // For all others: use effective playing XI (with auto-subs).
+                                    val scoringPlayerIds: List<Int> = if (isBenchBoost) {
+                                        // All 15 picks score (bench included)
+                                        picks.picks.map { it.element }
+                                    } else {
+                                        AutoSubstitutionHelper.getEffectivePlayingXI(
+                                            picks = picks.picks,
+                                            players = bootstrap.elements,
+                                            fixtures = fixtures
+                                        )
+                                    }
+
+                                    // In/ToStart counts use bench boost all-15 too
+                                    val (inPlay, toStart) = if (isBenchBoost) {
+                                        AutoSubstitutionHelper.countPlayersStatusForList(
+                                            playerIds = scoringPlayerIds,
+                                            players = bootstrap.elements,
+                                            fixtures = fixtures
+                                        )
+                                    } else {
+                                        AutoSubstitutionHelper.countPlayersStatus(
+                                            picks = picks.picks,
+                                            players = bootstrap.elements,
+                                            fixtures = fixtures
+                                        )
+                                    }
+
+                                    // Calculate FULL scoring player points
                                     var calculatedGwPoints = 0
-                                    
+
                                     // Find captain and vice captain
                                     val captainPick = picks.picks.find { it.isCaptain }
                                     val viceCaptainPick = picks.picks.find { it.isViceCaptain }
@@ -264,62 +305,61 @@ class LeagueStandingsViewModel : ViewModel() {
                                     val viceCaptainPlayer = viceCaptainPick?.let { pick ->
                                         bootstrap.elements.find { it.id == pick.element }
                                     }
-                                    
-                                    effectiveXI.forEach { playerId ->
+
+                                    scoringPlayerIds.forEach { playerId ->
                                         val player = bootstrap.elements.find { it.id == playerId }
                                         if (player != null) {
-                                            val fixture = fixtures.find { 
-                                                it.teamH == player.team || it.teamA == player.team 
+                                            val fixture = fixtures.find {
+                                                it.teamH == player.team || it.teamA == player.team
                                             }
-                                            
+
                                             val pick = picks.picks.find { it.element == playerId }
+                                            // multiplier from API already handles TC (3), normal captain (2), bench boost bench players (1)
                                             val multiplier = pick?.multiplier ?: 1
-                                            
+
                                             // Use live data if game started but not finished by FPL
                                             val shouldUseLiveData = fixture?.started == true && fixture.finished == false
-                                            
+
                                             var playerPoints = 0
-                                            
+
                                             if (shouldUseLiveData) {
                                                 val liveStats = liveGameweek?.elements?.find { it.id == playerId }
-                                                
+
                                                 if (liveStats != null) {
                                                     playerPoints = liveStats.stats.totalPoints
-                                                    
+
                                                     // Add provisional bonus ONLY if API hasn't provided bonus yet
                                                     val currentBonus = liveStats.stats.bonus
                                                     val provisionalBonusPoints = globalProvisionalBonus[playerId] ?: 0
-                                                    
+
                                                     if (currentBonus == 0 && provisionalBonusPoints > 0) {
                                                         playerPoints += provisionalBonusPoints
                                                         Log.d("LeagueStandings", "${standing.entryName} - ${player.webName}: +$provisionalBonusPoints provisional bonus")
                                                     }
-                                                    
-                                                    Log.d("LeagueStandings", "${standing.entryName} - ${player.webName}: ${playerPoints}pts × ${multiplier} = ${playerPoints * multiplier} (live)")
+
+                                                    Log.d("LeagueStandings", "${standing.entryName} - ${player.webName}: ${playerPoints}pts × ${multiplier} = ${playerPoints * multiplier} (live${if (isBenchBoost && (pick?.position ?: 0) > 11) "/BB" else ""})")
                                                 } else {
-                                                    // No live stats, use base
                                                     playerPoints = player.eventPoints
-                                                    Log.d("LeagueStandings", "${standing.entryName} - ${player.webName}: ${playerPoints}pts × ${multiplier} = ${playerPoints * multiplier} (base)")
                                                 }
                                             } else {
                                                 // Game not started or finished, use base points
                                                 playerPoints = player.eventPoints
                                                 Log.d("LeagueStandings", "${standing.entryName} - ${player.webName}: ${playerPoints}pts × ${multiplier} = ${playerPoints * multiplier} (base)")
                                             }
-                                            
+
                                             calculatedGwPoints += playerPoints * multiplier
                                         }
                                     }
-                                    
+
                                     // Use the higher of calculated vs API reported (in case API hasn't updated)
                                     val finalGwPoints = maxOf(calculatedGwPoints, standing.eventTotal)
                                     val livePointsDiff = calculatedGwPoints - standing.eventTotal
-                                    
-                                    Log.d("LeagueStandings", "Manager ${standing.entryName}: Calculated=$calculatedGwPoints, API=${standing.eventTotal}, Using=$finalGwPoints (diff=$livePointsDiff)")
-                                    
+
+                                    Log.d("LeagueStandings", "Manager ${standing.entryName}: Calculated=$calculatedGwPoints, API=${standing.eventTotal}, Using=$finalGwPoints (diff=$livePointsDiff, chip=$activeChip)")
+
                                     val totalLivePoints = standing.total + livePointsDiff
-                                    
-                                    Log.d("LeagueStandings", "Manager ${standing.entryName}: InPlay=$inPlay, ToStart=$toStart, GWPts=$finalGwPoints, Total=$totalLivePoints")
+
+                                    Log.d("LeagueStandings", "Manager ${standing.entryName}: InPlay=$inPlay, ToStart=$toStart, GWPts=$finalGwPoints, Total=$totalLivePoints, Chip=$activeChip#$chipNumber")
                                     ManagerLiveData(
                                         managerId = standing.entry,
                                         inPlay = inPlay,
@@ -327,7 +367,9 @@ class LeagueStandingsViewModel : ViewModel() {
                                         livePoints = livePointsDiff,
                                         totalLivePoints = totalLivePoints,
                                         captainName = captainPlayer?.webName,
-                                        viceCaptainName = viceCaptainPlayer?.webName
+                                        viceCaptainName = viceCaptainPlayer?.webName,
+                                        activeChip = activeChip,
+                                        chipNumber = chipNumber
                                     )
                                 } else {
                                     ManagerLiveData(standing.entry, 0, 0, 0, standing.eventTotal)
