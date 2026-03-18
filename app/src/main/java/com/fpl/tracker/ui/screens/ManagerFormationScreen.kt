@@ -58,6 +58,7 @@ fun ManagerFormationScreen(
     var showPlayerDialog by remember { mutableStateOf(false) }
     var playerDetail by remember { mutableStateOf<com.fpl.tracker.data.models.PlayerDetailResponse?>(null) }
     var leagueStats by remember { mutableStateOf<com.fpl.tracker.data.models.LeaguePlayerStats?>(null) }
+    var gwTransfers by remember { mutableStateOf<List<com.fpl.tracker.data.models.ManagerTransfer>>(emptyList()) }
     var isLoadingPlayerData by remember { mutableStateOf(false) }
     var isPitchView by remember { mutableStateOf(true) }
     val scope = rememberCoroutineScope()
@@ -66,6 +67,11 @@ fun ManagerFormationScreen(
     
     LaunchedEffect(managerId, eventId) {
         viewModel.loadManagerFormation(managerId, eventId)
+        // Load transfers alongside the formation — they belong to the screen, not a player
+        val transfersResult = repository.getManagerTransfers(managerId)
+        gwTransfers = transfersResult.getOrNull()
+            ?.filter { it.event == eventId }
+            ?: emptyList()
     }
 
     Scaffold(
@@ -375,6 +381,180 @@ fun ManagerFormationScreen(
                                         }",
                                         onPlayerClick = handlePlayerClick
                                     )
+                                }
+                            }
+                        }
+
+                        // GW Transfers Section
+                        if (gwTransfers.isNotEmpty()) {
+                            val transferCost = managerPicks.entryHistory.eventTransfersCost
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = Color(0xFF1A0A2E)
+                                )
+                            ) {
+                                Column(modifier = Modifier.padding(16.dp)) {
+                                    // Header row
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = "GW Transfers",
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 16.sp,
+                                            color = FrostedLilac
+                                        )
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .background(
+                                                        CelestialPurple.copy(alpha = 0.7f),
+                                                        RoundedCornerShape(12.dp)
+                                                    )
+                                                    .padding(horizontal = 8.dp, vertical = 3.dp)
+                                            ) {
+                                                Text(
+                                                    text = "${gwTransfers.size} transfer${if (gwTransfers.size > 1) "s" else ""}",
+                                                    fontSize = 11.sp,
+                                                    color = FrostedLilac,
+                                                    fontWeight = FontWeight.SemiBold
+                                                )
+                                            }
+                                            Box(
+                                                modifier = Modifier
+                                                    .background(
+                                                        if (transferCost > 0) EmberRed else AuroraTeal,
+                                                        RoundedCornerShape(12.dp)
+                                                    )
+                                                    .padding(horizontal = 8.dp, vertical = 3.dp)
+                                            ) {
+                                                Text(
+                                                    text = if (transferCost > 0) "-${transferCost}pts" else "Free",
+                                                    fontSize = 11.sp,
+                                                    color = Color.White,
+                                                    fontWeight = FontWeight.Bold
+                                                )
+                                            }
+                                        }
+                                    }
+
+                                    Spacer(modifier = Modifier.height(14.dp))
+
+                                    gwTransfers.forEachIndexed { index, transfer ->
+                                        val playerIn = bootstrap.elements.find { it.id == transfer.elementIn }
+                                        val playerOut = bootstrap.elements.find { it.id == transfer.elementOut }
+                                        val teamIn = playerIn?.let { p -> bootstrap.teams.find { it.id == p.team } }
+                                        val teamOut = playerOut?.let { p -> bootstrap.teams.find { it.id == p.team } }
+
+                                        if (index > 0) {
+                                            HorizontalDivider(
+                                                modifier = Modifier.padding(vertical = 10.dp),
+                                                color = FrostedLilac.copy(alpha = 0.12f)
+                                            )
+                                        }
+
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            // OUT player
+                                            Column(
+                                                modifier = Modifier.weight(1f),
+                                                horizontalAlignment = Alignment.CenterHorizontally
+                                            ) {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .size(40.dp)
+                                                        .background(
+                                                            color = if (teamOut != null) com.fpl.tracker.ui.components.getTeamColor(teamOut.id) else EmberRed.copy(alpha = 0.3f),
+                                                            shape = RoundedCornerShape(10.dp)
+                                                        ),
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    Text(
+                                                        text = teamOut?.shortName ?: "?",
+                                                        color = if (teamOut != null) com.fpl.tracker.ui.components.getTeamTextColor(teamOut.id) else Color.White,
+                                                        fontSize = 10.sp,
+                                                        fontWeight = FontWeight.Bold
+                                                    )
+                                                }
+                                                Spacer(modifier = Modifier.height(5.dp))
+                                                Text(
+                                                    text = playerOut?.webName ?: "Unknown",
+                                                    fontSize = 12.sp,
+                                                    fontWeight = FontWeight.SemiBold,
+                                                    color = EmberRed,
+                                                    textAlign = TextAlign.Center,
+                                                    maxLines = 2,
+                                                    overflow = TextOverflow.Ellipsis
+                                                )
+                                                Text(
+                                                    text = "£${transfer.elementOutCost / 10.0}m",
+                                                    fontSize = 10.sp,
+                                                    color = FrostedLilac.copy(alpha = 0.55f)
+                                                )
+                                            }
+
+                                            // Arrow
+                                            Column(
+                                                modifier = Modifier.padding(horizontal = 10.dp),
+                                                horizontalAlignment = Alignment.CenterHorizontally,
+                                                verticalArrangement = Arrangement.Center
+                                            ) {
+                                                Text(
+                                                    text = "→",
+                                                    color = SolarGold,
+                                                    fontSize = 22.sp,
+                                                    fontWeight = FontWeight.Bold
+                                                )
+                                            }
+
+                                            // IN player
+                                            Column(
+                                                modifier = Modifier.weight(1f),
+                                                horizontalAlignment = Alignment.CenterHorizontally
+                                            ) {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .size(40.dp)
+                                                        .background(
+                                                            color = if (teamIn != null) com.fpl.tracker.ui.components.getTeamColor(teamIn.id) else AuroraTeal.copy(alpha = 0.3f),
+                                                            shape = RoundedCornerShape(10.dp)
+                                                        ),
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    Text(
+                                                        text = teamIn?.shortName ?: "?",
+                                                        color = if (teamIn != null) com.fpl.tracker.ui.components.getTeamTextColor(teamIn.id) else Color.White,
+                                                        fontSize = 10.sp,
+                                                        fontWeight = FontWeight.Bold
+                                                    )
+                                                }
+                                                Spacer(modifier = Modifier.height(5.dp))
+                                                Text(
+                                                    text = playerIn?.webName ?: "Unknown",
+                                                    fontSize = 12.sp,
+                                                    fontWeight = FontWeight.SemiBold,
+                                                    color = AuroraTeal,
+                                                    textAlign = TextAlign.Center,
+                                                    maxLines = 2,
+                                                    overflow = TextOverflow.Ellipsis
+                                                )
+                                                Text(
+                                                    text = "£${transfer.elementInCost / 10.0}m",
+                                                    fontSize = 10.sp,
+                                                    color = FrostedLilac.copy(alpha = 0.55f)
+                                                )
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }

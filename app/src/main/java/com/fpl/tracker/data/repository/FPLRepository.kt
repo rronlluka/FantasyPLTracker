@@ -114,5 +114,18 @@ class FPLRepository(private val api: FPLApiService) {
             Result.failure(e)
         }
     }
+
+    suspend fun getManagerTransfers(managerId: Long): Result<List<ManagerTransfer>> = withContext(Dispatchers.IO) {
+        try {
+            val response = api.getManagerTransfers(managerId)
+            if (response.isSuccessful && response.body() != null) {
+                Result.success(response.body()!!)
+            } else {
+                Result.failure(Exception("Failed to fetch manager transfers: ${response.code()}"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
 }
 

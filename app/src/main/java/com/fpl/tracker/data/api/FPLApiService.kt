@@ -41,5 +41,10 @@ interface FPLApiService {
     
     @GET("element-summary/{element_id}/")
     suspend fun getPlayerDetail(@Path("element_id") elementId: Int): Response<PlayerDetailResponse>
+
+    @GET("entry/{manager_id}/transfers/")
+    suspend fun getManagerTransfers(
+        @Path("manager_id") managerId: Long
+    ): Response<List<ManagerTransfer>>
 }
 

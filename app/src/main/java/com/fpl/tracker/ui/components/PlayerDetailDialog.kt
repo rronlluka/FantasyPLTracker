@@ -171,7 +171,7 @@ fun SummaryTab(
     bootstrapData: BootstrapData?,
     currentEvent: Int,
     liveStats: LiveElement? = null,
-    chipsUsed: List<ChipUsage>? = null
+    chipsUsed: List<ChipUsage>? = null,
 ) {
     LazyColumn(
         modifier = Modifier
