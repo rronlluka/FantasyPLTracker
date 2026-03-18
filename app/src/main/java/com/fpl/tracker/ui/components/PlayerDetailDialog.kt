@@ -3,7 +3,6 @@ package com.fpl.tracker.ui.components
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -32,7 +31,6 @@ fun PlayerDetailDialog(
     bootstrapData: BootstrapData?,
     currentEvent: Int,
     liveStats: LiveElement? = null,
-    chipsUsed: List<ChipUsage>? = null,
     isLoadingLeagueStats: Boolean = false,
     onDismiss: () -> Unit
 ) {
@@ -142,8 +140,7 @@ fun PlayerDetailDialog(
                             leagueStats,
                             bootstrapData,
                             currentEvent,
-                            liveStats,
-                            chipsUsed
+                            liveStats
                         )
                         1 -> StartsTab(leagueStats, isLoadingLeagueStats)
                         2 -> BenchTab(leagueStats, isLoadingLeagueStats)
@@ -176,7 +173,6 @@ fun SummaryTab(
     bootstrapData: BootstrapData?,
     currentEvent: Int,
     liveStats: LiveElement? = null,
-    chipsUsed: List<ChipUsage>? = null,
 ) {
     LazyColumn(
         modifier = Modifier
@@ -197,63 +193,6 @@ fun SummaryTab(
             }
         }
 
-        // Chips summary
-        item {
-            Column(
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text(
-                    text = "Chips used",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                val chips = chipsUsed.orEmpty()
-                if (chips.isEmpty()) {
-                    Text(
-                        text = "None activated yet",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                } else {
-                    LazyRow(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        items(chips) { chip ->
-                            Card(
-                                modifier = Modifier
-                                    .defaultMinSize(minWidth = 120.dp),
-                                colors = CardDefaults.cardColors(
-                                    containerColor = MaterialTheme.colorScheme.secondaryContainer
-                                )
-                            ) {
-                                Column(
-                                    modifier = Modifier.padding(12.dp),
-                                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                                ) {
-                                    Text(
-                                        chip.name,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                    Text(
-                                        text = "GW${chip.event}",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                    Text(
-                                        text = chip.time,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        
         // Defensive Contributions (if available in live stats)
         item {
             liveStats?.explain?.let { explains ->

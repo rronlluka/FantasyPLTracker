@@ -3,6 +3,7 @@ package com.fpl.tracker.ui.screens
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -15,7 +16,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -34,8 +37,9 @@ import com.fpl.tracker.ui.theme.EmberRed
 import com.fpl.tracker.ui.theme.FrostedLilac
 import com.fpl.tracker.ui.theme.SolarGold
 import com.fpl.tracker.viewmodel.ManagerFormationViewModel
-import com.fpl.tracker.viewmodel.PlayerWithDetails
 import com.fpl.tracker.viewmodel.LeagueStandingsViewModel
+import com.fpl.tracker.viewmodel.PlayerWithDetails
+import com.fpl.tracker.viewmodel.UsedChip
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import androidx.compose.ui.platform.LocalContext
@@ -148,6 +152,9 @@ fun ManagerFormationScreen(
                     val managerPicks = uiState.managerPicks!!
                     val playersWithDetails = uiState.playersWithDetails
                     val bootstrap = uiState.bootstrapData!!
+                    val usedChips = remember(uiState.managerHistory?.chips) {
+                        buildUsedChips(uiState.managerHistory?.chips)
+                    }
                     
                     // Split players into starting XI and bench
                     val startingXI = playersWithDetails.filter { it.pick.position <= 11 }
@@ -251,16 +258,12 @@ fun ManagerFormationScreen(
                                     style = MaterialTheme.typography.bodyMedium
                                 )
                             }
-                            managerPicks.activeChip?.let {
-                                Text(
-                                    "Active Chip: $it",
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
-                                )
-                            }
                         }
+
+                        ManagerChipsCard(
+                            usedChips = usedChips,
+                            activeChip = managerPicks.activeChip
+                        )
 
                         // Starting XI - Pitch View or List View
                         Row(
@@ -628,7 +631,6 @@ fun ManagerFormationScreen(
                     bootstrapData = uiState.bootstrapData,
                     currentEvent = eventId,
                     liveStats = selectedPlayer!!.liveStats,
-                    chipsUsed = uiState.managerHistory?.chips,
                     isLoadingLeagueStats = isLoadingPlayerData,
                     onDismiss = {
                         showPlayerDialog = false
@@ -774,6 +776,127 @@ fun BenchPlayerCard(
                 }
             }
         }
+    }
+}
+
+private fun buildUsedChips(chips: List<com.fpl.tracker.data.models.ChipUsage>?): List<UsedChip> {
+    if (chips.isNullOrEmpty()) return emptyList()
+    val countByName = mutableMapOf<String, Int>()
+    return chips.sortedBy { it.event }.map { chip ->
+        val number = (countByName[chip.name] ?: 0) + 1
+        countByName[chip.name] = number
+        UsedChip(
+            name = chip.name,
+            event = chip.event,
+            number = number
+        )
+    }
+}
+
+@Composable
+private fun ManagerChipsCard(
+    usedChips: List<UsedChip>,
+    activeChip: String?
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = Color(0xFF161626)
+        )
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Chips Played",
+                        color = FrostedLilac,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = if (usedChips.isEmpty()) {
+                            "No chips used yet"
+                        } else {
+                            "${usedChips.size} chip${if (usedChips.size == 1) "" else "s"} this season"
+                        },
+                        color = FrostedLilac.copy(alpha = 0.68f),
+                        fontSize = 12.sp
+                    )
+                }
+                activeChip?.let { chip ->
+                    val label = chipLabel(chip, 1) ?: chip.uppercase()
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(chipColor(chip))
+                            .padding(horizontal = 10.dp, vertical = 6.dp)
+                    ) {
+                        Text(
+                            text = "Active $label",
+                            color = chipTextColor(chip),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.ExtraBold
+                        )
+                    }
+                }
+            }
+
+            if (usedChips.isEmpty()) {
+                Text(
+                    text = "This manager has not activated any chips so far.",
+                    color = Color(0xFF8C8CA1),
+                    fontSize = 12.sp,
+                    fontStyle = FontStyle.Italic
+                )
+            } else {
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    usedChips.forEach { chip ->
+                        ManagerChipHistoryBadge(chip = chip)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ManagerChipHistoryBadge(chip: UsedChip) {
+    val label = chipLabel(chip.name, chip.number) ?: chip.name.uppercase()
+    val color = chipColor(chip.name)
+    val textColor = chipTextColor(chip.name)
+
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Box(
+            modifier = Modifier
+                .clip(RoundedCornerShape(8.dp))
+                .background(color)
+                .padding(horizontal = 10.dp, vertical = 6.dp)
+        ) {
+            Text(
+                text = label,
+                color = textColor,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.ExtraBold,
+                letterSpacing = 0.3.sp
+            )
+        }
+        Text(
+            text = "GW${chip.event}",
+            color = Color(0xFF8C8CA1),
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Medium
+        )
     }
 }
 
