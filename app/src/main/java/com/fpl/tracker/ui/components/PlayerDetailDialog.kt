@@ -32,6 +32,7 @@ fun PlayerDetailDialog(
     currentEvent: Int,
     liveStats: LiveElement? = null,
     isLoadingLeagueStats: Boolean = false,
+    leagueStatsError: String? = null,
     onDismiss: () -> Unit
 ) {
     var selectedTabIndex by remember { mutableIntStateOf(0) }
@@ -98,6 +99,11 @@ fun PlayerDetailDialog(
                                     color = Color.White.copy(alpha = 0.8f),
                                     fontSize = 12.sp
                                 )
+                                Text(
+                                    text = "Selected league • GW$currentEvent",
+                                    color = Color.White.copy(alpha = 0.7f),
+                                    fontSize = 11.sp
+                                )
                             }
                         }
                         IconButton(onClick = onDismiss) {
@@ -142,8 +148,8 @@ fun PlayerDetailDialog(
                             currentEvent,
                             liveStats
                         )
-                        1 -> StartsTab(leagueStats, isLoadingLeagueStats)
-                        2 -> BenchTab(leagueStats, isLoadingLeagueStats)
+                        1 -> StartsTab(leagueStats, isLoadingLeagueStats, leagueStatsError)
+                        2 -> BenchTab(leagueStats, isLoadingLeagueStats, leagueStatsError)
                     }
                 }
 
@@ -181,6 +187,21 @@ fun SummaryTab(
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         // Debug: Log all explain identifiers to find defensive contributions
+        item {
+            Card(
+                colors = CardDefaults.cardColors(
+                    containerColor = Color(0xFFF3E5F5)
+                )
+            ) {
+                Text(
+                    "League stats on this dialog are for the selected league and GW$currentEvent only.",
+                    modifier = Modifier.padding(16.dp),
+                    color = Color(0xFF4A148C),
+                    fontSize = 12.sp
+                )
+            }
+        }
+
         item {
             liveStats?.explain?.let { explains ->
                 android.util.Log.d("PlayerDialog", "=== EXPLAIN STATS FOR ${player.webName} ===")
@@ -486,7 +507,11 @@ fun SummaryTab(
 }
 
 @Composable
-fun StartsTab(leagueStats: LeaguePlayerStats?, isLoading: Boolean = false) {
+fun StartsTab(
+    leagueStats: LeaguePlayerStats?,
+    isLoading: Boolean = false,
+    errorMessage: String? = null
+) {
     if (leagueStats == null) {
         Box(
             modifier = Modifier.fillMaxSize(),
@@ -499,6 +524,10 @@ fun StartsTab(leagueStats: LeaguePlayerStats?, isLoading: Boolean = false) {
                     Text("Checking league teams…", color = Color.Gray, fontSize = 13.sp)
                     Spacer(modifier = Modifier.height(4.dp))
                     Text("This checks up to 50 teams", color = Color.Gray, fontSize = 11.sp)
+                } else if (errorMessage != null) {
+                    Text("League stats unavailable", color = Color.Gray, fontSize = 14.sp)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(errorMessage, color = Color.Gray, fontSize = 12.sp, textAlign = TextAlign.Center)
                 } else {
                     Text("No league data available", color = Color.Gray, fontSize = 14.sp)
                     Spacer(modifier = Modifier.height(4.dp))
@@ -620,7 +649,11 @@ fun StartsTab(leagueStats: LeaguePlayerStats?, isLoading: Boolean = false) {
 }
 
 @Composable
-fun BenchTab(leagueStats: LeaguePlayerStats?, isLoading: Boolean = false) {
+fun BenchTab(
+    leagueStats: LeaguePlayerStats?,
+    isLoading: Boolean = false,
+    errorMessage: String? = null
+) {
     if (leagueStats == null) {
         Box(
             modifier = Modifier.fillMaxSize(),
@@ -633,6 +666,10 @@ fun BenchTab(leagueStats: LeaguePlayerStats?, isLoading: Boolean = false) {
                     Text("Checking league teams…", color = Color.Gray, fontSize = 13.sp)
                     Spacer(modifier = Modifier.height(4.dp))
                     Text("This checks up to 50 teams", color = Color.Gray, fontSize = 11.sp)
+                } else if (errorMessage != null) {
+                    Text("League stats unavailable", color = Color.Gray, fontSize = 14.sp)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(errorMessage, color = Color.Gray, fontSize = 12.sp, textAlign = TextAlign.Center)
                 } else {
                     Text("No league data available", color = Color.Gray, fontSize = 14.sp)
                     Spacer(modifier = Modifier.height(4.dp))

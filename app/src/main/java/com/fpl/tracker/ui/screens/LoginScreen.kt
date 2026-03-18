@@ -1,5 +1,6 @@
 package com.fpl.tracker.ui.screens
 
+import com.fpl.tracker.BuildConfig
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.WindowInsets
@@ -24,22 +25,34 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import com.fpl.tracker.data.api.BackendDiagnostics
+import com.fpl.tracker.data.api.BackendRetrofitInstance
 import com.fpl.tracker.data.preferences.PreferencesManager
+import com.fpl.tracker.data.repository.FPLRepository
 import com.fpl.tracker.navigation.Screen
 import com.fpl.tracker.ui.theme.AuroraTeal
 import com.fpl.tracker.ui.theme.CelestialPurple
 import com.fpl.tracker.ui.theme.DeepSpace
 import com.fpl.tracker.ui.theme.FrostedLilac
 import com.fpl.tracker.ui.theme.NightSky
+import kotlinx.coroutines.launch
 
 @Composable
 fun LoginScreen(navController: NavController) {
     val context = LocalContext.current
     val prefsManager = remember { PreferencesManager(context) }
+    val repository = remember { FPLRepository() }
+    val scope = rememberCoroutineScope()
+    val backendDiagnostics by BackendDiagnostics.state.collectAsState()
     
     var managerIdText by remember { mutableStateOf("") }
     var showError by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf("") }
+    var backendUrlText by remember {
+        mutableStateOf(prefsManager.getBackendUrl() ?: BackendRetrofitInstance.getBaseUrl())
+    }
+    var backendStatusMessage by remember { mutableStateOf<String?>(null) }
+    var isCheckingBackend by remember { mutableStateOf(false) }
 
     // Check if already logged in and auto-navigate
     LaunchedEffect(Unit) {
@@ -287,6 +300,103 @@ fun LoginScreen(navController: NavController) {
                 .fillMaxWidth()
                 .padding(bottom = 24.dp)
         )
+
+                if (BuildConfig.DEBUG) {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant
+                        )
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Text(
+                                "Debug Backend",
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            OutlinedTextField(
+                                value = backendUrlText,
+                                onValueChange = { backendUrlText = it },
+                                label = { Text("Backend URL") },
+                                placeholder = { Text("http://127.0.0.1:3000/api/") },
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true
+                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Button(
+                                    onClick = {
+                                        prefsManager.saveBackendUrl(backendUrlText)
+                                        BackendRetrofitInstance.updateBaseUrl(backendUrlText)
+                                        backendStatusMessage = "Saved backend URL"
+                                    },
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Text("Save URL")
+                                }
+                                OutlinedButton(
+                                    onClick = {
+                                        val defaultUrl = BackendRetrofitInstance.getDefaultBaseUrl()
+                                        backendUrlText = defaultUrl
+                                        prefsManager.saveBackendUrl(defaultUrl)
+                                        BackendRetrofitInstance.updateBaseUrl(defaultUrl)
+                                        backendStatusMessage = "Reset to default URL"
+                                    },
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Text("Reset")
+                                }
+                            }
+                            OutlinedButton(
+                                onClick = {
+                                    isCheckingBackend = true
+                                    scope.launch {
+                                        val result = repository.getBackendHealth()
+                                        backendStatusMessage = result.getOrNull()?.let {
+                                            "Backend healthy • uptime ${it.uptimeSeconds ?: 0}s"
+                                        } ?: "Health check failed: ${result.exceptionOrNull()?.message}"
+                                        isCheckingBackend = false
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                enabled = !isCheckingBackend
+                            ) {
+                                Text(if (isCheckingBackend) "Checking…" else "Check Backend Health")
+                            }
+                            Text(
+                                text = "Current URL: ${backendDiagnostics.baseUrl.ifBlank { BackendRetrofitInstance.getBaseUrl() }}",
+                                fontSize = 12.sp,
+                                color = FrostedLilac.copy(alpha = 0.85f)
+                            )
+                            backendStatusMessage?.let {
+                                Text(
+                                    text = it,
+                                    fontSize = 12.sp,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                            backendDiagnostics.lastHealthStatus?.let {
+                                Text(
+                                    text = "Health: $it",
+                                    fontSize = 12.sp,
+                                    color = FrostedLilac.copy(alpha = 0.8f)
+                                )
+                            }
+                            backendDiagnostics.lastError?.let {
+                                Text(
+                                    text = "Last backend error: $it",
+                                    fontSize = 12.sp,
+                                    color = Color(0xFFFF5555)
+                                )
+                            }
+                        }
+                    }
+                }
             }
         }
     }

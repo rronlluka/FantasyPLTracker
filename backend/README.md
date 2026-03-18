@@ -59,19 +59,21 @@ npm install
 
 ## Android config
 
-The Android app is currently pointed at:
+The app now supports a runtime backend URL in debug builds.
 
-`http://10.0.2.2:3000/api/`
+Default:
 
-That works for the Android emulator when the backend runs on the same computer.
+`http://127.0.0.1:3000/api/`
 
-If you test on a real phone, change:
+This is intended for `adb reverse tcp:3000 tcp:3000` on a physical Android device.
 
-[`BackendRetrofitInstance.kt`](/Users/rronlluka/AndroidStudioProjects/FantasyPLTracker/app/src/main/java/com/fpl/tracker/data/api/BackendRetrofitInstance.kt)
+You can change the backend URL from the debug panel on the login screen without editing code.
 
-to your computer's LAN IP, for example:
+Examples:
 
-`http://192.168.1.25:3000/api/`
+- Emulator host access: `http://10.0.2.2:3000/api/`
+- Physical device on same Wi-Fi: `http://192.168.1.25:3000/api/`
+- ADB reverse on a physical device: `http://127.0.0.1:3000/api/`
 
 ## Useful endpoints
 
@@ -113,6 +115,7 @@ Tables:
 
 - `cache`
 - `league_picks`
+- `league_snapshots`
 - `player_stats`
 
 ## How to inspect the DB
@@ -144,8 +147,16 @@ select league_id, gameweek, player_id, starts_count, bench_count, captain_count 
 ## Cache behavior
 
 - Generic FPL proxy responses use TTLs in [`cache.js`](/Users/rronlluka/AndroidStudioProjects/FantasyPLTracker/backend/src/cache.js)
-- `league_picks` are refreshed when missing, stale, or force-refreshed
+- `league_picks` are snapshot-based per gameweek and are refreshed only when missing or manually force-refreshed
+- `league_snapshots` store snapshot completeness, fetch duration, and failed-manager metadata
 - `player_stats` are recomputed from cached `league_picks`
+- concurrent refreshes for the same `league + gameweek` are deduplicated in-memory
+
+## Admin protection
+
+- Admin routes are enabled by default outside production
+- In production, set `ENABLE_ADMIN=true` to expose them
+- Set `ADMIN_SECRET=your-secret` to require the `x-admin-secret` header for `/admin/*`
 
 ## Current app integration
 

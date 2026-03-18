@@ -4,6 +4,7 @@
  */
 
 const https = require('https');
+const { recordFplCall } = require('./metrics');
 
 const FPL_BASE_HOST = 'fantasy.premierleague.com';
 const FPL_BASE_PATH = '/api';
@@ -37,36 +38,48 @@ function httpsGet(path) {
       res.on('end', () => {
         if (res.statusCode >= 200 && res.statusCode < 300) {
           try {
+            recordFplCall(true);
             resolve(JSON.parse(body));
           } catch (e) {
+            recordFplCall(false);
             reject(new Error(`JSON parse error for ${path}: ${e.message}`));
           }
         } else {
-          reject(new Error(`FPL API ${path} returned HTTP ${res.statusCode}`));
+          const error = new Error(`FPL API ${path} returned HTTP ${res.statusCode}`);
+          error.statusCode = res.statusCode;
+          recordFplCall(false);
+          reject(error);
         }
       });
     });
 
     req.on('timeout', () => {
       req.destroy();
+      recordFplCall(false);
       reject(new Error(`Timeout fetching ${path}`));
     });
-    req.on('error', reject);
+    req.on('error', (err) => {
+      recordFplCall(false);
+      reject(err);
+    });
     req.end();
   });
 }
 
 /**
- * Retry wrapper — retries once on failure.
+ * Retry wrapper — retries transient failures with backoff.
  */
 async function fplGet(path) {
-  for (let attempt = 1; attempt <= 2; attempt++) {
+  const maxAttempts = 3;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
       return await httpsGet(path);
     } catch (err) {
-      if (attempt === 2) throw err;
+      const statusCode = err.statusCode ?? 0;
+      const retryable = statusCode === 0 || statusCode === 429 || statusCode >= 500;
+      if (attempt === maxAttempts || !retryable) throw err;
       console.warn(`[fpl] Retrying ${path} (attempt ${attempt}): ${err.message}`);
-      await new Promise(r => setTimeout(r, 600 * attempt));
+      await new Promise(r => setTimeout(r, 500 * (2 ** (attempt - 1))));
     }
   }
 }
@@ -137,11 +150,13 @@ async function getAllLeagueStandings(leagueId) {
  * Fetches picks for all managers in a league for a given GW.
  * Batched to avoid overwhelming FPL API.
  */
-async function fetchAllManagerPicks(leagueId, gameweek, batchSize = 8) {
+async function fetchAllManagerPicks(leagueId, gameweek, batchSize = 4) {
+  const startedAt = Date.now();
   const { league, results } = await getAllLeagueStandings(leagueId);
   console.log(`[fpl] League "${league.name}" — ${results.length} managers, fetching GW${gameweek} picks…`);
 
   const managerPicks = [];
+  const failedManagers = [];
 
   for (let i = 0; i < results.length; i += batchSize) {
     const batch = results.slice(i, i + batchSize);
@@ -156,20 +171,38 @@ async function fetchAllManagerPicks(leagueId, gameweek, batchSize = 8) {
         };
       })
     );
-    for (const result of batchResults) {
+    batchResults.forEach((result, index) => {
       if (result.status === 'fulfilled') {
         managerPicks.push(result.value);
       } else {
         console.warn(`[fpl] Failed picks fetch: ${result.reason?.message}`);
+        const failedStanding = batch[index];
+        if (failedStanding) {
+          failedManagers.push({
+            managerId: failedStanding.entry,
+            entryName: failedStanding.entry_name,
+            rank: failedStanding.rank,
+            error: result.reason?.message ?? 'Unknown error',
+          });
+        }
       }
-    }
+    });
     if (i + batchSize < results.length) {
       await new Promise(r => setTimeout(r, 300));
     }
   }
 
-  console.log(`[fpl] Got picks for ${managerPicks.length}/${results.length} managers`);
-  return managerPicks;
+  const durationMs = Date.now() - startedAt;
+  console.log(`[fpl] Got picks for ${managerPicks.length}/${results.length} managers in ${durationMs}ms`);
+  return {
+    league,
+    managers: managerPicks,
+    managerCountExpected: results.length,
+    managerCountFetched: managerPicks.length,
+    failedManagers,
+    partial: failedManagers.length > 0,
+    fetchDurationMs: durationMs,
+  };
 }
 
 module.exports = {

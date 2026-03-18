@@ -7,15 +7,17 @@
 
 const express = require('express');
 const router = express.Router();
-const { getDbInfo, db } = require('../db');
+const { getDbInfo, db, listActiveCache, deleteCacheKey, deleteAllCache, getLeagueSnapshot } = require('../storage');
+const { getMetrics } = require('../metrics');
+const { sendApiSuccess, sendApiError } = require('../response');
 
 // GET /admin/db-info
 // Returns row counts and sample rows for every table, plus the DB file path.
 router.get('/db-info', (req, res) => {
   try {
-    res.json(getDbInfo());
+    sendApiSuccess(res, getDbInfo());
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendApiError(res, 500, 'db_info_failed', err.message);
   }
 });
 
@@ -23,33 +25,30 @@ router.get('/db-info', (req, res) => {
 // Lists all non-expired cache entries (key + expiry)
 router.get('/cache', (req, res) => {
   try {
-    const now = Math.floor(Date.now() / 1000);
-    const rows = db.prepare(
-      'SELECT key, expires_at, length(value) as size_bytes FROM cache WHERE expires_at > ? ORDER BY key'
-    ).all(now);
-    res.json({ count: rows.length, entries: rows });
+    const rows = listActiveCache();
+    sendApiSuccess(res, { count: rows.length, entries: rows });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendApiError(res, 500, 'cache_list_failed', err.message);
   }
 });
 
 // DELETE /admin/cache/:key  — remove a specific cache entry
 router.delete('/cache/:key', (req, res) => {
   try {
-    db.prepare('DELETE FROM cache WHERE key = ?').run(req.params.key);
-    res.json({ ok: true });
+    deleteCacheKey(req.params.key);
+    sendApiSuccess(res, { ok: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendApiError(res, 500, 'cache_delete_failed', err.message);
   }
 });
 
 // DELETE /admin/cache  — flush entire cache
 router.delete('/cache', (req, res) => {
   try {
-    const result = db.prepare('DELETE FROM cache').run();
-    res.json({ ok: true, deleted: result.changes });
+    const result = deleteAllCache();
+    sendApiSuccess(res, { ok: true, deleted: result.changes });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendApiError(res, 500, 'cache_flush_failed', err.message);
   }
 });
 
@@ -60,9 +59,13 @@ router.get('/league-picks/:leagueId/:gameweek', (req, res) => {
     const rows = db.prepare(
       'SELECT manager_id, entry_name, rank, fetched_at FROM league_picks WHERE league_id = ? AND gameweek = ? ORDER BY rank'
     ).all(req.params.leagueId, req.params.gameweek);
-    res.json({ count: rows.length, managers: rows });
+    sendApiSuccess(res, {
+      count: rows.length,
+      snapshot: getLeagueSnapshot(req.params.leagueId, req.params.gameweek),
+      managers: rows,
+    });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendApiError(res, 500, 'league_picks_failed', err.message);
   }
 });
 
@@ -74,9 +77,9 @@ router.get('/player-stats/:leagueId/:gameweek', (req, res) => {
       `SELECT player_id, starts_count, bench_count, captain_count, starts_pct, owned_pct, computed_at
        FROM player_stats WHERE league_id = ? AND gameweek = ? ORDER BY owned_pct DESC`
     ).all(req.params.leagueId, req.params.gameweek);
-    res.json({ count: rows.length, players: rows });
+    sendApiSuccess(res, { count: rows.length, players: rows });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendApiError(res, 500, 'player_stats_list_failed', err.message);
   }
 });
 
@@ -86,17 +89,18 @@ router.get('/stats', (req, res) => {
     const cacheCount  = db.prepare('SELECT COUNT(*) as c FROM cache WHERE expires_at > ?').get(Math.floor(Date.now() / 1000)).c;
     const picksCount  = db.prepare('SELECT COUNT(*) as c FROM league_picks').get().c;
     const statsCount  = db.prepare('SELECT COUNT(*) as c FROM player_stats').get().c;
+    const snapshotCount = db.prepare('SELECT COUNT(*) as c FROM league_snapshots').get().c;
     const leaguesSeen = db.prepare('SELECT COUNT(DISTINCT league_id) as c FROM league_picks').get().c;
-    res.json({
+    sendApiSuccess(res, {
       activeCacheEntries: cacheCount,
       storedManagerPicks: picksCount,
+      storedSnapshots: snapshotCount,
       computedPlayerStats: statsCount,
       leaguesSeen,
-      uptime: process.uptime(),
-      memoryMB: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
+      metrics: getMetrics(),
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendApiError(res, 500, 'admin_stats_failed', err.message);
   }
 });
 

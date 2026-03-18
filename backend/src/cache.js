@@ -2,7 +2,8 @@
  * cache.js  —  TTL constants and a helper that wraps "check cache → fetch → store".
  */
 
-const { cacheGet, cacheSet } = require('./db');
+const { cacheGet, cacheSet } = require('./storage');
+const { recordCacheHit } = require('./metrics');
 
 // ── TTL values (seconds) ──────────────────────────────────────────────────────
 
@@ -28,8 +29,10 @@ const TTL = {
 async function withCache(key, ttl, fetchFn) {
   const cached = cacheGet(key);
   if (cached !== null) {
+    recordCacheHit(true);
     return { data: cached, fromCache: true };
   }
+  recordCacheHit(false);
   const data = await fetchFn();
   cacheSet(key, data, ttl);
   return { data, fromCache: false };

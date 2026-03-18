@@ -13,17 +13,18 @@ const router = express.Router();
 const fpl = require('../fpl');
 const { TTL, withCache } = require('../cache');
 const { ensureLeaguePicks, computePlayerStats } = require('../leaguePicks');
+const { getLeagueSnapshot, countLeaguePicks } = require('../storage');
+const { sendApiSuccess, sendApiError } = require('../response');
 
 // ── Bootstrap ─────────────────────────────────────────────────────────────────
 // GET /api/bootstrap-static/
 router.get('/bootstrap-static/', async (req, res) => {
   try {
     const { data, fromCache } = await withCache('bootstrap', TTL.BOOTSTRAP, fpl.getBootstrap);
-    res.set('X-From-Cache', String(fromCache));
-    res.json(data);
+    sendApiSuccess(res, data, { fromCache });
   } catch (err) {
     console.error('[bootstrap]', err.message);
-    res.status(502).json({ error: err.message });
+    sendApiError(res, 502, 'bootstrap_failed', err.message);
   }
 });
 
@@ -35,11 +36,10 @@ router.get('/fixtures/', async (req, res) => {
   const key = eventId != null ? `fixtures:gw${eventId}` : 'fixtures:all';
   try {
     const { data, fromCache } = await withCache(key, TTL.FIXTURES, () => fpl.getFixtures(eventId));
-    res.set('X-From-Cache', String(fromCache));
-    res.json(data);
+    sendApiSuccess(res, data, { fromCache });
   } catch (err) {
     console.error('[fixtures]', err.message);
-    res.status(502).json({ error: err.message });
+    sendApiError(res, 502, 'fixtures_failed', err.message);
   }
 });
 
@@ -51,11 +51,10 @@ router.get('/event/:eventId/live/', async (req, res) => {
   try {
     // Use shorter TTL if this is likely the current active GW
     const { data, fromCache } = await withCache(key, TTL.LIVE_ACTIVE, () => fpl.getLiveGameweek(eventId));
-    res.set('X-From-Cache', String(fromCache));
-    res.json(data);
+    sendApiSuccess(res, data, { fromCache });
   } catch (err) {
     console.error('[live]', err.message);
-    res.status(502).json({ error: err.message });
+    sendApiError(res, 502, 'live_failed', err.message);
   }
 });
 
@@ -73,11 +72,10 @@ router.get('/leagues-classic/:leagueId/standings/', async (req, res) => {
       TTL.LEAGUE_STANDINGS,
       () => fpl.getLeagueStandings(leagueId, page, eventId)
     );
-    res.set('X-From-Cache', String(fromCache));
-    res.json(data);
+    sendApiSuccess(res, data, { fromCache });
   } catch (err) {
     console.error('[league standings]', err.message);
-    res.status(502).json({ error: err.message });
+    sendApiError(res, 502, 'league_standings_failed', err.message);
   }
 });
 
@@ -88,11 +86,10 @@ router.get('/entry/:managerId/', async (req, res) => {
   const key = `manager:${managerId}`;
   try {
     const { data, fromCache } = await withCache(key, TTL.MANAGER_DATA, () => fpl.getManagerData(managerId));
-    res.set('X-From-Cache', String(fromCache));
-    res.json(data);
+    sendApiSuccess(res, data, { fromCache });
   } catch (err) {
     console.error('[manager data]', err.message);
-    res.status(502).json({ error: err.message });
+    sendApiError(res, 502, 'manager_data_failed', err.message);
   }
 });
 
@@ -103,11 +100,10 @@ router.get('/entry/:managerId/history/', async (req, res) => {
   const key = `manager:${managerId}:history`;
   try {
     const { data, fromCache } = await withCache(key, TTL.MANAGER_HISTORY, () => fpl.getManagerHistory(managerId));
-    res.set('X-From-Cache', String(fromCache));
-    res.json(data);
+    sendApiSuccess(res, data, { fromCache });
   } catch (err) {
     console.error('[manager history]', err.message);
-    res.status(502).json({ error: err.message });
+    sendApiError(res, 502, 'manager_history_failed', err.message);
   }
 });
 
@@ -123,11 +119,10 @@ router.get('/entry/:managerId/event/:eventId/picks/', async (req, res) => {
       TTL.MANAGER_PICKS,
       () => fpl.getManagerPicks(managerId, eventId)
     );
-    res.set('X-From-Cache', String(fromCache));
-    res.json(data);
+    sendApiSuccess(res, data, { fromCache });
   } catch (err) {
     console.error('[manager picks]', err.message);
-    res.status(502).json({ error: err.message });
+    sendApiError(res, 502, 'manager_picks_failed', err.message);
   }
 });
 
@@ -142,11 +137,10 @@ router.get('/entry/:managerId/transfers/', async (req, res) => {
       TTL.MANAGER_TRANSFERS,
       () => fpl.getManagerTransfers(managerId)
     );
-    res.set('X-From-Cache', String(fromCache));
-    res.json(data);
+    sendApiSuccess(res, data, { fromCache });
   } catch (err) {
     console.error('[manager transfers]', err.message);
-    res.status(502).json({ error: err.message });
+    sendApiError(res, 502, 'manager_transfers_failed', err.message);
   }
 });
 
@@ -161,11 +155,10 @@ router.get('/element-summary/:elementId/', async (req, res) => {
       TTL.PLAYER_DETAIL,
       () => fpl.getPlayerDetail(elementId)
     );
-    res.set('X-From-Cache', String(fromCache));
-    res.json(data);
+    sendApiSuccess(res, data, { fromCache });
   } catch (err) {
     console.error('[player detail]', err.message);
-    res.status(502).json({ error: err.message });
+    sendApiError(res, 502, 'player_detail_failed', err.message);
   }
 });
 
@@ -186,31 +179,36 @@ router.get('/league/:leagueId/gw/:gameweek/player/:playerId/stats', async (req, 
   const forceRefresh = req.query.refresh === 'true';
 
   if (isNaN(leagueId) || isNaN(gameweek) || isNaN(playerId)) {
-    return res.status(400).json({ error: 'Invalid leagueId, gameweek, or playerId' });
+    return sendApiError(res, 400, 'invalid_params', 'Invalid leagueId, gameweek, or playerId');
   }
 
   try {
-    // Step 1: Make sure all picks for this league+GW are in the DB
-    const refreshed = await ensureLeaguePicks(leagueId, gameweek, forceRefresh);
-
-    // Step 2: Compute stats from DB (no FPL calls)
+    const refreshResult = await ensureLeaguePicks(leagueId, gameweek, forceRefresh);
+    const snapshot = refreshResult.snapshot ?? getLeagueSnapshot(leagueId, gameweek);
     const stats = computePlayerStats(leagueId, gameweek, playerId);
 
     if (!stats) {
-      return res.status(404).json({ error: 'No picks data found for this league/gameweek' });
+      return sendApiError(res, 404, 'snapshot_missing', 'No picks data found for this league/gameweek');
     }
 
-    res.json({
+    sendApiSuccess(res, {
       ...stats,
       meta: {
         leagueId,
         gameweek,
-        picksRefreshed: refreshed,
+        picksRefreshed: refreshResult.refreshed,
+        snapshotStatus: snapshot?.status ?? 'missing',
+        managerCountExpected: snapshot?.managerCountExpected ?? 0,
+        managerCountFetched: snapshot?.managerCountFetched ?? countLeaguePicks(leagueId, gameweek),
+        failedCount: snapshot?.failedCount ?? 0,
+        fetchedAt: snapshot?.fetchedAt ?? null,
       },
+    }, {
+      snapshotStatus: snapshot?.status ?? 'missing',
     });
   } catch (err) {
     console.error('[player stats]', err.message);
-    res.status(502).json({ error: err.message });
+    sendApiError(res, 502, 'player_stats_failed', err.message);
   }
 });
 
@@ -220,12 +218,18 @@ router.post('/league/:leagueId/gw/:gameweek/refresh-picks', async (req, res) => 
   const leagueId = parseInt(req.params.leagueId);
   const gameweek = parseInt(req.params.gameweek);
   try {
-    await ensureLeaguePicks(leagueId, gameweek, true);
-    const count = require('../db').countLeaguePicks(leagueId, gameweek);
-    res.json({ ok: true, managersStored: count, leagueId, gameweek });
+    const refreshResult = await ensureLeaguePicks(leagueId, gameweek, true);
+    const snapshot = refreshResult.snapshot ?? getLeagueSnapshot(leagueId, gameweek);
+    sendApiSuccess(res, {
+      ok: true,
+      leagueId,
+      gameweek,
+      snapshot,
+      managersStored: countLeaguePicks(leagueId, gameweek),
+    });
   } catch (err) {
     console.error('[refresh picks]', err.message);
-    res.status(502).json({ error: err.message });
+    sendApiError(res, 502, 'refresh_picks_failed', err.message);
   }
 });
 

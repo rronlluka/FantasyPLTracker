@@ -60,6 +60,7 @@ fun ManagerFormationScreen(
     var showPlayerDialog by remember { mutableStateOf(false) }
     var playerDetail by remember { mutableStateOf<com.fpl.tracker.data.models.PlayerDetailResponse?>(null) }
     var leagueStats by remember { mutableStateOf<com.fpl.tracker.data.models.LeaguePlayerStats?>(null) }
+    var leagueStatsError by remember { mutableStateOf<String?>(null) }
     var gwTransfers by remember { mutableStateOf<List<com.fpl.tracker.data.models.ManagerTransfer>>(emptyList()) }
     var isLoadingPlayerData by remember { mutableStateOf(false) }
     var playerRequestId by remember { mutableIntStateOf(0) }
@@ -296,6 +297,7 @@ fun ManagerFormationScreen(
                             selectedPlayer = playerWithDetails
                             playerDetail = null
                             leagueStats = null
+                            leagueStatsError = null
                             showPlayerDialog = true
                             isLoadingPlayerData = true
                             scope.launch {
@@ -310,23 +312,25 @@ fun ManagerFormationScreen(
                                                 leagueId = savedLeagueId,
                                                 gameweek = eventId,
                                                 playerId = playerWithDetails.player.id
-                                            ).getOrNull()
+                                            )
                                         } else {
-                                            null
+                                            Result.failure(Exception("No league selected for league-scoped stats"))
                                         }
                                     }
 
                                     val detail = detailDeferred.await()
-                                    val stats = statsDeferred.await()
+                                    val statsResult = statsDeferred.await()
 
                                     if (playerRequestId == requestId &&
                                         selectedPlayer?.player?.id == playerWithDetails.player.id
                                     ) {
                                         playerDetail = detail
-                                        leagueStats = stats
+                                        leagueStats = statsResult.getOrNull()
+                                        leagueStatsError = statsResult.exceptionOrNull()?.message
                                     }
                                 } catch (e: Exception) {
                                     Log.e("PlayerDialog", "Error loading player data: ${e.message}")
+                                    leagueStatsError = e.message
                                 } finally {
                                     if (playerRequestId == requestId &&
                                         selectedPlayer?.player?.id == playerWithDetails.player.id
@@ -620,11 +624,13 @@ fun ManagerFormationScreen(
                     currentEvent = eventId,
                     liveStats = selectedPlayer!!.liveStats,
                     isLoadingLeagueStats = isLoadingPlayerData,
+                    leagueStatsError = leagueStatsError,
                     onDismiss = {
                         showPlayerDialog = false
                         selectedPlayer = null
                         playerDetail = null
                         leagueStats = null
+                        leagueStatsError = null
                     }
                 )
             }

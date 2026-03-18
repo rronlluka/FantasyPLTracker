@@ -14,33 +14,81 @@
  * burst of N API calls (one per manager) — once per GW per league.
  */
 
-const db = require('./db');
+const storage = require('./storage');
 const fpl = require('./fpl');
+const { recordSnapshotRefresh, recordSnapshotLockWait } = require('./metrics');
 
-// How old (in seconds) picks data can be before we re-fetch.
-// Picks lock at deadline so this can be generous. We use 1 hour during GW,
-// but you could set it to the entire GW length.
-const PICKS_MAX_AGE_SECONDS = 60 * 60; // 1 hour
+const inflightRefreshes = new Map();
+
+function snapshotKey(leagueId, gameweek) {
+  return `${leagueId}:${gameweek}`;
+}
 
 /**
- * Ensures the league's picks for a GW are in the DB and fresh.
- * Returns true if picks were refreshed, false if they were already fresh.
+ * Ensures the league's picks for a GW are in the DB.
+ * Snapshots are immutable per GW unless forceRefresh is requested.
  */
 async function ensureLeaguePicks(leagueId, gameweek, forceRefresh = false) {
-  const now = Math.floor(Date.now() / 1000);
-  const count = db.countLeaguePicks(leagueId, gameweek);
-  const age = db.getLeaguePicksAge(leagueId, gameweek);
-  const isStale = !age || (now - age) > PICKS_MAX_AGE_SECONDS;
+  const existingSnapshot = storage.getLeagueSnapshot(leagueId, gameweek);
+  const existingCount = storage.countLeaguePicks(leagueId, gameweek);
 
-  if (!forceRefresh && count > 0 && !isStale) {
-    console.log(`[picks] Cache hit — league ${leagueId} GW${gameweek} (${count} managers, age ${Math.round((now - age) / 60)}min)`);
-    return false;
+  if (!forceRefresh && existingSnapshot && existingCount > 0) {
+    console.log(`[picks] Snapshot hit — league ${leagueId} GW${gameweek} (${existingCount}/${existingSnapshot.managerCountExpected})`);
+    return {
+      refreshed: false,
+      snapshot: existingSnapshot,
+    };
   }
 
-  console.log(`[picks] ${forceRefresh ? 'Force refresh' : 'Cache miss/stale'} — fetching league ${leagueId} GW${gameweek}…`);
-  const managers = await fpl.fetchAllManagerPicks(leagueId, gameweek);
-  db.saveLeaguePicks(leagueId, gameweek, managers);
-  return true;
+  const key = snapshotKey(leagueId, gameweek);
+  if (inflightRefreshes.has(key)) {
+    recordSnapshotLockWait();
+    return inflightRefreshes.get(key);
+  }
+
+  const refreshPromise = refreshLeagueSnapshot(leagueId, gameweek, forceRefresh)
+    .finally(() => inflightRefreshes.delete(key));
+  inflightRefreshes.set(key, refreshPromise);
+  return refreshPromise;
+}
+
+async function refreshLeagueSnapshot(leagueId, gameweek, forceRefresh) {
+  console.log(`[picks] ${forceRefresh ? 'Force refresh' : 'Missing snapshot'} — fetching league ${leagueId} GW${gameweek}…`);
+  try {
+    const snapshotData = await fpl.fetchAllManagerPicks(leagueId, gameweek);
+    const fetchedAt = Math.floor(Date.now() / 1000);
+    const snapshot = {
+      leagueName: snapshotData.league?.name,
+      managerCountExpected: snapshotData.managerCountExpected,
+      managerCountFetched: snapshotData.managerCountFetched,
+      failedCount: snapshotData.failedManagers.length,
+      failedManagers: snapshotData.failedManagers,
+      status: snapshotData.partial ? 'partial' : 'ready',
+      fetchedAt,
+      refreshDurationMs: snapshotData.fetchDurationMs,
+      lastError: null,
+    };
+    storage.saveLeaguePicks(leagueId, gameweek, snapshot, snapshotData.managers);
+    recordSnapshotRefresh(true);
+    return {
+      refreshed: true,
+      snapshot,
+    };
+  } catch (err) {
+    const failedSnapshot = {
+      status: 'failed',
+      fetchedAt: Math.floor(Date.now() / 1000),
+      lastError: err.message,
+      managerCountExpected: 0,
+      managerCountFetched: 0,
+      failedCount: 0,
+      failedManagers: [],
+      refreshDurationMs: null,
+    };
+    storage.saveLeagueSnapshot(leagueId, gameweek, failedSnapshot);
+    recordSnapshotRefresh(false);
+    throw err;
+  }
 }
 
 /**
@@ -49,11 +97,11 @@ async function ensureLeaguePicks(leagueId, gameweek, forceRefresh = false) {
  */
 function computePlayerStats(leagueId, gameweek, playerId) {
   // Check if we already have pre-computed stats
-  const cached = db.getPlayerStats(leagueId, gameweek, playerId);
+  const cached = storage.getPlayerStats(leagueId, gameweek, playerId);
   if (cached) return cached;
 
   // Compute from raw picks
-  const rows = db.getLeaguePicks(leagueId, gameweek);
+  const rows = storage.getLeaguePicks(leagueId, gameweek);
   if (rows.length === 0) return null;
 
   let startsCount = 0;
@@ -104,7 +152,7 @@ function computePlayerStats(leagueId, gameweek, playerId) {
   };
 
   // Persist for next request
-  db.savePlayerStats(leagueId, gameweek, stats);
+  storage.savePlayerStats(leagueId, gameweek, stats);
   return stats;
 }
 

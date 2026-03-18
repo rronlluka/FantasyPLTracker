@@ -13,6 +13,7 @@ class PreferencesManager(context: Context) {
         private const val KEY_LEAGUE_ID = "league_id"
         private const val KEY_FAVORITE_LEAGUE_ID = "favorite_league_id"
         private const val KEY_FAVORITE_LEAGUE_NAME = "favorite_league_name"
+        private const val KEY_BACKEND_URL = "backend_url"
     }
 
     fun saveManagerId(managerId: Long) {
@@ -31,6 +32,14 @@ class PreferencesManager(context: Context) {
     fun getLeagueId(): Long? {
         val id = prefs.getLong(KEY_LEAGUE_ID, -1L)
         return if (id == -1L) null else id
+    }
+
+    fun saveBackendUrl(url: String) {
+        prefs.edit().putString(KEY_BACKEND_URL, url).apply()
+    }
+
+    fun getBackendUrl(): String? {
+        return prefs.getString(KEY_BACKEND_URL, null)
     }
     
     fun saveFavoriteLeague(leagueId: Long, leagueName: String) {
@@ -60,4 +69,3 @@ class PreferencesManager(context: Context) {
         prefs.edit().clear().apply()
     }
 }
-

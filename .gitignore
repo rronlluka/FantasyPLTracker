@@ -18,3 +18,5 @@ local.properties
 /backend/node_modules
 
 backend/node_modules/
+backend/data/*.db-wal
+backend/data/*.db-shm

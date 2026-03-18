@@ -8,7 +8,10 @@
 const express = require('express');
 const cors    = require('cors');
 const cron    = require('node-cron');
-const { cachePrune } = require('./db');
+const { cachePrune } = require('./storage');
+const { recordRequest, getMetrics } = require('./metrics');
+const { adminGuard, adminEnabled } = require('./adminGuard');
+const { sendApiSuccess } = require('./response');
 
 const fplRoutes   = require('./routes/fplRoutes');
 const adminRoutes = require('./routes/adminRoutes');
@@ -23,18 +26,33 @@ app.use(express.json());
 app.use((req, res, next) => {
   const start = Date.now();
   res.on('finish', () => {
-    const cached = res.getHeader('X-From-Cache') === 'true' ? ' [CACHE]' : '';
-    console.log(`${req.method} ${req.originalUrl} → ${res.statusCode} (${Date.now() - start}ms)${cached}`);
+    const durationMs = Date.now() - start;
+    const cached = res.getHeader('X-From-Cache') === 'true';
+    const logEntry = {
+      method: req.method,
+      path: req.originalUrl,
+      status: res.statusCode,
+      durationMs,
+      cached,
+    };
+    recordRequest(req.route?.path || req.path, res.statusCode, durationMs);
+    console.log(JSON.stringify(logEntry));
   });
   next();
 });
 
 // ── Routes ────────────────────────────────────────────────────────────────────
 app.use('/api', fplRoutes);
-app.use('/admin', adminRoutes);
+app.use('/admin', adminGuard, adminRoutes);
 
 // Health check
-app.get('/health', (req, res) => res.json({ ok: true, ts: new Date().toISOString() }));
+app.get('/health', (req, res) => sendApiSuccess(res, {
+  ok: true,
+  ts: new Date().toISOString(),
+  uptimeSeconds: Math.round(process.uptime()),
+  adminEnabled: adminEnabled(),
+  metrics: getMetrics(),
+}));
 
 // ── Scheduled jobs ────────────────────────────────────────────────────────────
 // Prune expired cache entries every 30 minutes
@@ -53,8 +71,7 @@ app.listen(PORT, () => {
   console.log('║  Key endpoints:                               ║');
   console.log('║  GET  /api/bootstrap-static/                  ║');
   console.log('║  GET  /api/league/:id/gw/:gw/player/:pid/stats║');
-  console.log('║  GET  /admin/stats                            ║');
-  console.log('║  GET  /admin/db-info                          ║');
+  console.log(`║  Admin enabled: ${String(adminEnabled()).padEnd(29, ' ')}║`);
   console.log('╚═══════════════════════════════════════════════╝');
   console.log('');
 });

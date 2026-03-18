@@ -18,6 +18,9 @@ import retrofit2.http.Query
  */
 interface BackendApiService {
 
+    @GET("/health")
+    suspend fun getHealth(): Response<BackendHealthResponse>
+
     // ── Proxied FPL endpoints (identical paths to FPL API) ───────────────────
     // The backend caches these so the app doesn't hammer FPL directly.
 
