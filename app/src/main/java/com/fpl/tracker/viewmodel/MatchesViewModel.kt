@@ -2,7 +2,6 @@ package com.fpl.tracker.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.fpl.tracker.data.api.RetrofitInstance
 import com.fpl.tracker.data.models.*
 import com.fpl.tracker.data.repository.FPLRepository
 import kotlinx.coroutines.Job
@@ -25,7 +24,7 @@ data class MatchesUiState(
 )
 
 class MatchesViewModel : ViewModel() {
-    private val repository = FPLRepository(RetrofitInstance.api)
+    private val repository = FPLRepository()
 
     private val _uiState = MutableStateFlow(MatchesUiState())
     val uiState: StateFlow<MatchesUiState> = _uiState.asStateFlow()

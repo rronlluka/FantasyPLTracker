@@ -3,7 +3,6 @@ package com.fpl.tracker.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import android.util.Log
-import com.fpl.tracker.data.api.RetrofitInstance
 import com.fpl.tracker.data.models.*
 import com.fpl.tracker.data.repository.FPLRepository
 import com.fpl.tracker.utils.BonusPointsCalculator
@@ -37,7 +36,7 @@ data class ManagerFormationUiState(
 )
 
 class ManagerFormationViewModel : ViewModel() {
-    private val repository = FPLRepository(RetrofitInstance.api)
+    private val repository = FPLRepository()
     
     private val _uiState = MutableStateFlow(ManagerFormationUiState())
     val uiState: StateFlow<ManagerFormationUiState> = _uiState.asStateFlow()

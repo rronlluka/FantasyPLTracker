@@ -102,3 +102,34 @@ data class LeaguePlayerStats(
     val startedBy: List<LeagueManagerRef>,   // Teams who started
     val benchedBy: List<LeagueManagerRef>    // Teams who benched
 )
+
+/**
+ * Response from the backend's /api/league/{id}/gw/{gw}/player/{pid}/stats endpoint.
+ * Field names match exactly what the Node.js backend returns (camelCase JSON).
+ */
+data class BackendLeaguePlayerStats(
+    val playerId: Int,
+    val startsCount: Int,
+    val benchCount: Int,
+    val captainCount: Int,
+    val viceCaptainCount: Int,
+    val startsPercentage: Double,
+    val ownedPercentage: Double,
+    val startedBy: List<LeagueManagerRef>,
+    val benchedBy: List<LeagueManagerRef>,
+    val captainedBy: List<LeagueManagerRef>
+) {
+    /** Convert to the app's existing LeaguePlayerStats type. */
+    fun toLeaguePlayerStats() = LeaguePlayerStats(
+        playerId         = playerId,
+        startsCount      = startsCount,
+        benchCount       = benchCount,
+        captainCount     = captainCount,
+        viceCaptainCount = viceCaptainCount,
+        startsPercentage = startsPercentage,
+        ownedPercentage  = ownedPercentage,
+        captainedBy      = captainedBy,
+        startedBy        = startedBy,
+        benchedBy        = benchedBy
+    )
+}

@@ -27,7 +27,6 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import android.util.Log
-import com.fpl.tracker.data.api.RetrofitInstance
 import com.fpl.tracker.data.repository.FPLRepository
 import com.fpl.tracker.ui.components.FootballPitch
 import com.fpl.tracker.ui.components.PlayerDetailDialog
@@ -37,7 +36,6 @@ import com.fpl.tracker.ui.theme.EmberRed
 import com.fpl.tracker.ui.theme.FrostedLilac
 import com.fpl.tracker.ui.theme.SolarGold
 import com.fpl.tracker.viewmodel.ManagerFormationViewModel
-import com.fpl.tracker.viewmodel.LeagueStandingsViewModel
 import com.fpl.tracker.viewmodel.PlayerWithDetails
 import com.fpl.tracker.viewmodel.UsedChip
 import kotlinx.coroutines.async
@@ -57,36 +55,27 @@ fun ManagerFormationScreen(
     val context = LocalContext.current
     val prefsManager = remember { PreferencesManager(context) }
     val uiState by viewModel.uiState.collectAsState()
-    val leagueViewModel: LeagueStandingsViewModel = viewModel()
     
     var selectedPlayer by remember { mutableStateOf<PlayerWithDetails?>(null) }
     var showPlayerDialog by remember { mutableStateOf(false) }
     var playerDetail by remember { mutableStateOf<com.fpl.tracker.data.models.PlayerDetailResponse?>(null) }
     var leagueStats by remember { mutableStateOf<com.fpl.tracker.data.models.LeaguePlayerStats?>(null) }
     var gwTransfers by remember { mutableStateOf<List<com.fpl.tracker.data.models.ManagerTransfer>>(emptyList()) }
-    // Cache league standings so we only fetch them once per screen, not per player tap
-    var cachedLeagueStandings by remember { mutableStateOf<com.fpl.tracker.data.models.LeagueStandings?>(null) }
     var isLoadingPlayerData by remember { mutableStateOf(false) }
     var playerRequestId by remember { mutableIntStateOf(0) }
     var isPitchView by remember { mutableStateOf(true) }
     val scope = rememberCoroutineScope()
-    val repository = remember { FPLRepository(RetrofitInstance.api) }
+    val repository = remember { FPLRepository() }
     val formationTitle = teamName.takeIf { it.isNotBlank() } ?: "Team Formation"
     
     LaunchedEffect(managerId, eventId) {
         viewModel.loadManagerFormation(managerId, eventId)
-        // Fetch transfers and league standings in parallel — both belong to the screen,
-        // not to an individual player tap
-        val savedLeagueId = prefsManager.getLeagueId()
+        // Fetch transfers once for this screen.
         val transfersDeferred = async { repository.getManagerTransfers(managerId).getOrNull() }
-        val standingsDeferred = if (savedLeagueId != null) {
-            async { repository.getLeagueStandings(savedLeagueId, eventId = eventId).getOrNull() }
-        } else null
 
         gwTransfers = transfersDeferred.await()
             ?.filter { it.event == eventId }
             ?: emptyList()
-        cachedLeagueStandings = standingsDeferred?.await()
     }
 
     Scaffold(
@@ -315,14 +304,13 @@ fun ManagerFormationScreen(
                                         repository.getPlayerDetail(playerWithDetails.player.id).getOrNull()
                                     }
                                     val statsDeferred = async {
-                                        val standings = cachedLeagueStandings
-                                        if (standings != null && uiState.bootstrapData != null) {
-                                            leagueViewModel.calculateLeaguePlayerStats(
-                                                playerId = playerWithDetails.player.id,
-                                                leagueStandings = standings,
-                                                currentEvent = eventId,
-                                                bootstrapData = uiState.bootstrapData!!
-                                            )
+                                        val savedLeagueId = prefsManager.getLeagueId()
+                                        if (savedLeagueId != null) {
+                                            repository.getLeaguePlayerStats(
+                                                leagueId = savedLeagueId,
+                                                gameweek = eventId,
+                                                playerId = playerWithDetails.player.id
+                                            ).getOrNull()
                                         } else {
                                             null
                                         }
