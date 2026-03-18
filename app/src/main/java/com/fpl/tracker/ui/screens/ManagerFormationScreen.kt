@@ -36,6 +36,7 @@ import com.fpl.tracker.ui.theme.SolarGold
 import com.fpl.tracker.viewmodel.ManagerFormationViewModel
 import com.fpl.tracker.viewmodel.PlayerWithDetails
 import com.fpl.tracker.viewmodel.LeagueStandingsViewModel
+import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import androidx.compose.ui.platform.LocalContext
 import com.fpl.tracker.data.preferences.PreferencesManager
@@ -59,7 +60,10 @@ fun ManagerFormationScreen(
     var playerDetail by remember { mutableStateOf<com.fpl.tracker.data.models.PlayerDetailResponse?>(null) }
     var leagueStats by remember { mutableStateOf<com.fpl.tracker.data.models.LeaguePlayerStats?>(null) }
     var gwTransfers by remember { mutableStateOf<List<com.fpl.tracker.data.models.ManagerTransfer>>(emptyList()) }
+    // Cache league standings so we only fetch them once per screen, not per player tap
+    var cachedLeagueStandings by remember { mutableStateOf<com.fpl.tracker.data.models.LeagueStandings?>(null) }
     var isLoadingPlayerData by remember { mutableStateOf(false) }
+    var playerRequestId by remember { mutableIntStateOf(0) }
     var isPitchView by remember { mutableStateOf(true) }
     val scope = rememberCoroutineScope()
     val repository = remember { FPLRepository(RetrofitInstance.api) }
@@ -67,11 +71,18 @@ fun ManagerFormationScreen(
     
     LaunchedEffect(managerId, eventId) {
         viewModel.loadManagerFormation(managerId, eventId)
-        // Load transfers alongside the formation — they belong to the screen, not a player
-        val transfersResult = repository.getManagerTransfers(managerId)
-        gwTransfers = transfersResult.getOrNull()
+        // Fetch transfers and league standings in parallel — both belong to the screen,
+        // not to an individual player tap
+        val savedLeagueId = prefsManager.getLeagueId()
+        val transfersDeferred = async { repository.getManagerTransfers(managerId).getOrNull() }
+        val standingsDeferred = if (savedLeagueId != null) {
+            async { repository.getLeagueStandings(savedLeagueId, eventId = eventId).getOrNull() }
+        } else null
+
+        gwTransfers = transfersDeferred.await()
             ?.filter { it.event == eventId }
             ?: emptyList()
+        cachedLeagueStandings = standingsDeferred?.await()
     }
 
     Scaffold(
@@ -288,42 +299,49 @@ fun ManagerFormationScreen(
 
                         // Shared click handler for player clicks
                         val handlePlayerClick: (PlayerWithDetails) -> Unit = { playerWithDetails ->
+                            val requestId = playerRequestId + 1
+                            playerRequestId = requestId
                             selectedPlayer = playerWithDetails
+                            playerDetail = null
+                            leagueStats = null
+                            showPlayerDialog = true
                             isLoadingPlayerData = true
                             scope.launch {
                                 try {
-                                    Log.d("PlayerDialog", "Loading data for player: ${playerWithDetails.player.webName}")
-                                    val detailResult = repository.getPlayerDetail(playerWithDetails.player.id)
-                                    val detail = detailResult.getOrNull()
-                                    Log.d("PlayerDialog", "Player detail loaded: ${detail != null}")
-                                    var stats: com.fpl.tracker.data.models.LeaguePlayerStats? = null
-                                    val savedLeagueId = prefsManager.getLeagueId()
-                                    if (savedLeagueId != null && uiState.bootstrapData != null) {
-                                        Log.d("PlayerDialog", "Loading league stats for league: $savedLeagueId")
-                                        val leagueResult = repository.getLeagueStandings(savedLeagueId)
-                                        val leagueStandings = leagueResult.getOrNull()
-                                        if (leagueStandings != null) {
-                                            Log.d("PlayerDialog", "League standings loaded, calculating stats...")
-                                            stats = leagueViewModel.calculateLeaguePlayerStats(
+                                    val detailDeferred = async {
+                                        repository.getPlayerDetail(playerWithDetails.player.id).getOrNull()
+                                    }
+                                    val statsDeferred = async {
+                                        val standings = cachedLeagueStandings
+                                        if (standings != null && uiState.bootstrapData != null) {
+                                            leagueViewModel.calculateLeaguePlayerStats(
                                                 playerId = playerWithDetails.player.id,
-                                                leagueStandings = leagueStandings,
+                                                leagueStandings = standings,
                                                 currentEvent = eventId,
                                                 bootstrapData = uiState.bootstrapData!!
                                             )
-                                            Log.d("PlayerDialog", "Stats calculated - Starts: ${stats.startsCount}, Bench: ${stats.benchCount}, Captain: ${stats.captainCount}")
                                         } else {
-                                            Log.d("PlayerDialog", "Failed to load league standings")
+                                            null
                                         }
-                                    } else {
-                                        Log.d("PlayerDialog", "No saved league ID or bootstrap data not loaded")
                                     }
-                                    playerDetail = detail
-                                    leagueStats = stats
-                                    isLoadingPlayerData = false
-                                    showPlayerDialog = true
+
+                                    val detail = detailDeferred.await()
+                                    val stats = statsDeferred.await()
+
+                                    if (playerRequestId == requestId &&
+                                        selectedPlayer?.player?.id == playerWithDetails.player.id
+                                    ) {
+                                        playerDetail = detail
+                                        leagueStats = stats
+                                    }
                                 } catch (e: Exception) {
                                     Log.e("PlayerDialog", "Error loading player data: ${e.message}")
-                                    isLoadingPlayerData = false
+                                } finally {
+                                    if (playerRequestId == requestId &&
+                                        selectedPlayer?.player?.id == playerWithDetails.player.id
+                                    ) {
+                                        isLoadingPlayerData = false
+                                    }
                                 }
                             }
                         }
@@ -562,8 +580,8 @@ fun ManagerFormationScreen(
                 }
             }
             
-            // Show loading overlay when loading player data
-            if (isLoadingPlayerData) {
+            // Only block the full screen if the dialog has not opened yet.
+            if (isLoadingPlayerData && !showPlayerDialog) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -601,7 +619,7 @@ fun ManagerFormationScreen(
             }
             
             // Show player detail dialog only after data is loaded
-            if (showPlayerDialog && selectedPlayer != null && !isLoadingPlayerData) {
+            if (showPlayerDialog && selectedPlayer != null) {
                 PlayerDetailDialog(
                     player = selectedPlayer!!.player,
                     team = selectedPlayer!!.team,
@@ -611,6 +629,7 @@ fun ManagerFormationScreen(
                     currentEvent = eventId,
                     liveStats = selectedPlayer!!.liveStats,
                     chipsUsed = uiState.managerHistory?.chips,
+                    isLoadingLeagueStats = isLoadingPlayerData,
                     onDismiss = {
                         showPlayerDialog = false
                         selectedPlayer = null

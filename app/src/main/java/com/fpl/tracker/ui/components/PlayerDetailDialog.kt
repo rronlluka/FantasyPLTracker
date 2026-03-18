@@ -33,10 +33,15 @@ fun PlayerDetailDialog(
     currentEvent: Int,
     liveStats: LiveElement? = null,
     chipsUsed: List<ChipUsage>? = null,
+    isLoadingLeagueStats: Boolean = false,
     onDismiss: () -> Unit
 ) {
     var selectedTabIndex by remember { mutableIntStateOf(0) }
-    val tabs = listOf("Summary", "Starts (${leagueStats?.startsCount ?: 0})", "Bench (${leagueStats?.benchCount ?: 0})")
+    val tabs = listOf(
+        "Summary",
+        if (leagueStats != null) "Starts (${leagueStats.startsCount})" else "Starts",
+        if (leagueStats != null) "Bench (${leagueStats.benchCount})" else "Bench"
+    )
     
     Dialog(onDismissRequest = onDismiss) {
         Card(
@@ -140,8 +145,8 @@ fun PlayerDetailDialog(
                             liveStats,
                             chipsUsed
                         )
-                        1 -> StartsTab(leagueStats)
-                        2 -> BenchTab(leagueStats)
+                        1 -> StartsTab(leagueStats, isLoadingLeagueStats)
+                        2 -> BenchTab(leagueStats, isLoadingLeagueStats)
                     }
                 }
 
@@ -542,16 +547,24 @@ fun SummaryTab(
 }
 
 @Composable
-fun StartsTab(leagueStats: LeaguePlayerStats?) {
+fun StartsTab(leagueStats: LeaguePlayerStats?, isLoading: Boolean = false) {
     if (leagueStats == null) {
         Box(
             modifier = Modifier.fillMaxSize(),
             contentAlignment = Alignment.Center
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
-                Spacer(modifier = Modifier.height(8.dp))
-                Text("Loading league data...", color = Color.Gray)
+                if (isLoading) {
+                    CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text("Checking league teams…", color = Color.Gray, fontSize = 13.sp)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text("This checks up to 50 teams", color = Color.Gray, fontSize = 11.sp)
+                } else {
+                    Text("No league data available", color = Color.Gray, fontSize = 14.sp)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text("Open a league to see starts info", color = Color.Gray, fontSize = 12.sp)
+                }
             }
         }
         return
@@ -659,16 +672,24 @@ fun StartsTab(leagueStats: LeaguePlayerStats?) {
 }
 
 @Composable
-fun BenchTab(leagueStats: LeaguePlayerStats?) {
+fun BenchTab(leagueStats: LeaguePlayerStats?, isLoading: Boolean = false) {
     if (leagueStats == null) {
         Box(
             modifier = Modifier.fillMaxSize(),
             contentAlignment = Alignment.Center
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
-                Spacer(modifier = Modifier.height(8.dp))
-                Text("Loading league data...", color = Color.Gray)
+                if (isLoading) {
+                    CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text("Checking league teams…", color = Color.Gray, fontSize = 13.sp)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text("This checks up to 50 teams", color = Color.Gray, fontSize = 11.sp)
+                } else {
+                    Text("No league data available", color = Color.Gray, fontSize = 14.sp)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text("Open a league to see bench info", color = Color.Gray, fontSize = 12.sp)
+                }
             }
         }
         return

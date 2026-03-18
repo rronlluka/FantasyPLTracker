@@ -179,7 +179,9 @@ fun EnhancedLeagueStandingsScreen(
                             standings       = standings,
                             managerLiveData = uiState.managerLiveData,
                             currentEvent    = uiState.currentEvent,
-                            userEntryId     = prefsManager.getManagerId()?.toInt()
+                            userEntryId     = prefsManager.getManagerId()?.toInt(),
+                            leagueId        = leagueId,
+                            prefsManager    = prefsManager
                         )
                     } else {
                         NormalRankingsView(
@@ -195,6 +197,9 @@ fun EnhancedLeagueStandingsScreen(
                             onClearGameweek    = { viewModel.clearGameweekSelection() },
                             onRowClick         = { standing ->
                                 val gwForNav = uiState.selectedGameweek ?: uiState.currentEvent
+                                // Persist the league ID so ManagerFormationScreen can fetch
+                                // league-wide player stats (Starts/Bench tabs) correctly.
+                                prefsManager.saveLeagueId(leagueId)
                                 navController.navigate(
                                     Screen.ManagerFormation.createRoute(
                                         standing.entry.toLong(),
@@ -692,7 +697,9 @@ private fun ChipHistoryView(
     standings: List<StandingEntry>,
     managerLiveData: Map<Int, ManagerLiveData>,
     currentEvent: Int,
-    userEntryId: Int?
+    userEntryId: Int?,
+    leagueId: Long = 0L,
+    prefsManager: PreferencesManager? = null
 ) {
     LazyColumn(modifier = Modifier.fillMaxSize()) {
 
@@ -762,6 +769,7 @@ private fun ChipHistoryView(
                 isUserTeam = isUserTeam,
                 allChips   = liveData?.allChips ?: emptyList(),
                 onChipClick = { managerId, eventId, teamName ->
+                    if (leagueId != 0L) prefsManager?.saveLeagueId(leagueId)
                     navController.navigate(
                         Screen.ManagerFormation.createRoute(managerId, eventId, teamName)
                     )

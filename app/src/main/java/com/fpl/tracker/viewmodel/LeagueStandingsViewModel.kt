@@ -10,6 +10,7 @@ import com.fpl.tracker.utils.AutoSubstitutionHelper
 import com.fpl.tracker.utils.BonusPointsCalculator
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -88,7 +89,21 @@ class LeagueStandingsViewModel : ViewModel() {
         leagueStandings: LeagueStandings,
         currentEvent: Int,
         bootstrapData: BootstrapData
-    ): LeaguePlayerStats {
+    ): LeaguePlayerStats = coroutineScope {
+        val managersToCheck = leagueStandings.standings.results.take(50)
+
+        // Fetch all managers' picks in parallel instead of one by one
+        val picksResults = managersToCheck.map { standing ->
+            async {
+                try {
+                    val picks = repository.getManagerPicks(standing.entry.toLong(), currentEvent).getOrNull()
+                    Pair(standing, picks)
+                } catch (e: Exception) {
+                    Pair(standing, null)
+                }
+            }
+        }.awaitAll()
+
         var startsCount = 0
         var benchCount = 0
         var captainCount = 0
@@ -96,43 +111,33 @@ class LeagueStandingsViewModel : ViewModel() {
         val captainedBy = mutableListOf<String>()
         val startedBy = mutableListOf<String>()
         val benchedBy = mutableListOf<String>()
-        
-        val managersToCheck = leagueStandings.standings.results.take(50)
-        
-        managersToCheck.forEach { standing ->
-            try {
-                val picksResult = repository.getManagerPicks(standing.entry.toLong(), currentEvent)
-                val picks = picksResult.getOrNull()
-                
-                picks?.picks?.forEach { pick ->
-                    if (pick.element == playerId) {
-                        if (pick.position <= 11) {
-                            startsCount++
-                            startedBy.add(standing.entryName)
-                            
-                            if (pick.isCaptain) {
-                                captainCount++
-                                captainedBy.add(standing.entryName)
-                            }
-                            if (pick.isViceCaptain) {
-                                viceCaptainCount++
-                            }
-                        } else {
-                            benchCount++
-                            benchedBy.add(standing.entryName)
+
+        picksResults.forEach { (standing, picks) ->
+            picks?.picks?.forEach { pick ->
+                if (pick.element == playerId) {
+                    if (pick.position <= 11) {
+                        startsCount++
+                        startedBy.add(standing.entryName)
+                        if (pick.isCaptain) {
+                            captainCount++
+                            captainedBy.add(standing.entryName)
                         }
+                        if (pick.isViceCaptain) {
+                            viceCaptainCount++
+                        }
+                    } else {
+                        benchCount++
+                        benchedBy.add(standing.entryName)
                     }
                 }
-            } catch (e: Exception) {
-                // Skip on error
             }
         }
-        
+
         val totalManagers = managersToCheck.size
-        val startsPercentage = (startsCount.toDouble() / totalManagers) * 100
-        val ownedPercentage = ((startsCount + benchCount).toDouble() / totalManagers) * 100
-        
-        return LeaguePlayerStats(
+        val startsPercentage = if (totalManagers > 0) (startsCount.toDouble() / totalManagers) * 100 else 0.0
+        val ownedPercentage = if (totalManagers > 0) ((startsCount + benchCount).toDouble() / totalManagers) * 100 else 0.0
+
+        LeaguePlayerStats(
             playerId = playerId,
             startsCount = startsCount,
             benchCount = benchCount,
@@ -526,4 +531,3 @@ class LeagueStandingsViewModel : ViewModel() {
         }
     }
 }
-
