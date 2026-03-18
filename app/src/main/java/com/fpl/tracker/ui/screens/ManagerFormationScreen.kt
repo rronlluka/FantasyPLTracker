@@ -151,21 +151,23 @@ fun ManagerFormationScreen(
                                 containerColor = MaterialTheme.colorScheme.secondaryContainer
                             )
                         ) {
-                            // Calculate live points - sum up starting XI with live/just finished games
+                            // Calculate live points - ONLY for truly live games (not yet finished by FPL)
+                            // For historical GWs all fixtures are finished, so livePoints stays 0
+                            // and entryHistory.points is already the correct final total.
                             var livePoints = 0
                             startingXI.forEach { playerDetail ->
-                                // Count points if hasLivePoints (live or just finished within 3 hours)
-                                if (playerDetail.hasLivePoints && playerDetail.liveStats != null) {
+                                // Only count if the game is truly in-progress (isLive), not for
+                                // finished games (including historical GW lookups)
+                                if (playerDetail.isLive && playerDetail.liveStats != null) {
                                     var pts = playerDetail.liveStats.stats.totalPoints
-                                    
+
                                     // Add provisional bonus if player doesn't have bonus yet
-                                    // (works for both truly live AND just finished games)
                                     val currentBonus = playerDetail.liveStats.stats.bonus
                                     val provisionalBonusPoints = uiState.provisionalBonus[playerDetail.player.id] ?: 0
                                     if (currentBonus == 0 && provisionalBonusPoints > 0) {
                                         pts += provisionalBonusPoints
                                     }
-                                    
+
                                     livePoints += pts * playerDetail.pick.multiplier
                                 }
                             }

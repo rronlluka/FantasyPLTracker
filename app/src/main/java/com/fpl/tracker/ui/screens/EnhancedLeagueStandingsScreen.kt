@@ -84,7 +84,11 @@ fun EnhancedLeagueStandingsScreen(
     var showFavoriteDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(leagueId) {
-        viewModel.loadLeagueStandings(leagueId)
+        // Only load if we haven't already loaded data for this league.
+        // This prevents back-navigation from resetting a selected historical GW.
+        if (uiState.leagueStandings == null) {
+            viewModel.loadLeagueStandings(leagueId)
+        }
     }
 
     Scaffold(

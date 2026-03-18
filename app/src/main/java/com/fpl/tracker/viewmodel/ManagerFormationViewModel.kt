@@ -94,14 +94,18 @@ class ManagerFormationViewModel : ViewModel() {
                     }
                     
                     // Determine game state
-                    val isTrulyLive = fixture?.started == true && 
-                        fixture.finished == false && 
+                    val isTrulyLive = fixture?.started == true &&
+                        fixture.finished == false &&
                         fixture.finishedProvisional == false
-                    
+
                     // isLive = visual indicator (only truly live games)
-                    // hasLivePoints = should count points from live API (started but not finished by FPL)
+                    // hasLivePoints = should count points from live API:
+                    //   - live or just finished (current GW): fixture started but not finished by FPL
+                    //   - historical GW: fixture is finished, so use live API data (which is already
+                    //     loaded for the correct eventId) whenever liveStats are available
                     val isLive = isTrulyLive
-                    val hasLivePoints = fixture?.started == true && fixture.finished == false
+                    val hasLivePoints = (fixture?.started == true && fixture.finished == false)
+                        || (fixture?.finished == true && liveStats != null)
                     val hasPlayed = fixture?.finished == true
                     
                     PlayerWithDetails(
