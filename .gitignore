@@ -16,3 +16,5 @@
 .cxx
 local.properties
 /backend/node_modules
+
+backend/node_modules/
