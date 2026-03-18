@@ -85,6 +85,11 @@ data class PlayerHistoryPast(
 )
 
 // League-specific player stats
+data class LeagueManagerRef(
+    val entryName: String,
+    val rank: Int
+)
+
 data class LeaguePlayerStats(
     val playerId: Int,
     val startsCount: Int,
@@ -93,8 +98,7 @@ data class LeaguePlayerStats(
     val viceCaptainCount: Int,
     val startsPercentage: Double,
     val ownedPercentage: Double,
-    val captainedBy: List<String>, // List of team names who captained
-    val startedBy: List<String>,   // List of team names who started
-    val benchedBy: List<String>    // List of team names who benched
+    val captainedBy: List<LeagueManagerRef>, // Teams who captained
+    val startedBy: List<LeagueManagerRef>,   // Teams who started
+    val benchedBy: List<LeagueManagerRef>    // Teams who benched
 )
-

@@ -616,7 +616,7 @@ fun StartsTab(leagueStats: LeaguePlayerStats?, isLoading: Boolean = false) {
                         )
                     }
                     
-                    items(captainedTeams) { teamName ->
+                    items(captainedTeams) { manager ->
                         Card(
                             colors = CardDefaults.cardColors(
                                 containerColor = Color(0xFFFFE0B2)
@@ -630,7 +630,12 @@ fun StartsTab(leagueStats: LeaguePlayerStats?, isLoading: Boolean = false) {
                             ) {
                                 Text("⭐", fontSize = 20.sp)
                                 Spacer(modifier = Modifier.width(8.dp))
-                                Text(teamName, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = Color.Black)
+                                ManagerRankText(
+                                    manager = manager,
+                                    fontSize = 14.sp,
+                                    color = Color.Black,
+                                    fontWeight = FontWeight.SemiBold
+                                )
                             }
                         }
                     }
@@ -647,7 +652,7 @@ fun StartsTab(leagueStats: LeaguePlayerStats?, isLoading: Boolean = false) {
                         )
                     }
                     
-                    items(startedOnly) { teamName ->
+                    items(startedOnly) { manager ->
                         Card(
                             colors = CardDefaults.cardColors(
                                 containerColor = Color(0xFFE8F5E9)
@@ -661,7 +666,11 @@ fun StartsTab(leagueStats: LeaguePlayerStats?, isLoading: Boolean = false) {
                             ) {
                                 Text("✓", fontSize = 16.sp, color = Color(0xFF4CAF50))
                                 Spacer(modifier = Modifier.width(8.dp))
-                                Text(teamName, fontSize = 14.sp, color = Color.Black)
+                                ManagerRankText(
+                                    manager = manager,
+                                    fontSize = 14.sp,
+                                    color = Color.Black
+                                )
                             }
                         }
                     }
@@ -753,7 +762,7 @@ fun BenchTab(leagueStats: LeaguePlayerStats?, isLoading: Boolean = false) {
                 }
                 
                 // Show benched teams
-                items(stats.benchedBy) { teamName ->
+                items(stats.benchedBy) { manager ->
                     Card(
                         colors = CardDefaults.cardColors(
                             containerColor = Color(0xFFFFF9C4)
@@ -767,7 +776,11 @@ fun BenchTab(leagueStats: LeaguePlayerStats?, isLoading: Boolean = false) {
                         ) {
                             Text("🪑", fontSize = 16.sp)
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text(teamName, fontSize = 14.sp, color = Color.Black)
+                            ManagerRankText(
+                                manager = manager,
+                                fontSize = 14.sp,
+                                color = Color.Black
+                            )
                         }
                     }
                 }
@@ -810,6 +823,21 @@ fun StatRow(label: String, value: String) {
         Text(label, fontSize = 13.sp, color = Color(0xFF666666))
         Text(value, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Color.Black)
     }
+}
+
+@Composable
+fun ManagerRankText(
+    manager: LeagueManagerRef,
+    fontSize: androidx.compose.ui.unit.TextUnit,
+    color: Color,
+    fontWeight: FontWeight = FontWeight.Normal
+) {
+    Text(
+        text = "#${manager.rank} ${manager.entryName}",
+        fontSize = fontSize,
+        color = color,
+        fontWeight = fontWeight
+    )
 }
 
 fun getPositionName(elementType: Int): String {

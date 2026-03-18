@@ -108,26 +108,30 @@ class LeagueStandingsViewModel : ViewModel() {
         var benchCount = 0
         var captainCount = 0
         var viceCaptainCount = 0
-        val captainedBy = mutableListOf<String>()
-        val startedBy = mutableListOf<String>()
-        val benchedBy = mutableListOf<String>()
+        val captainedBy = mutableListOf<LeagueManagerRef>()
+        val startedBy = mutableListOf<LeagueManagerRef>()
+        val benchedBy = mutableListOf<LeagueManagerRef>()
 
         picksResults.forEach { (standing, picks) ->
             picks?.picks?.forEach { pick ->
                 if (pick.element == playerId) {
+                    val managerRef = LeagueManagerRef(
+                        entryName = standing.entryName,
+                        rank = standing.rank
+                    )
                     if (pick.position <= 11) {
                         startsCount++
-                        startedBy.add(standing.entryName)
+                        startedBy.add(managerRef)
                         if (pick.isCaptain) {
                             captainCount++
-                            captainedBy.add(standing.entryName)
+                            captainedBy.add(managerRef)
                         }
                         if (pick.isViceCaptain) {
                             viceCaptainCount++
                         }
                     } else {
                         benchCount++
-                        benchedBy.add(standing.entryName)
+                        benchedBy.add(managerRef)
                     }
                 }
             }
