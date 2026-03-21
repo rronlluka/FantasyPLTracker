@@ -217,8 +217,8 @@ fun FixtureCard(
     liveElements: List<LiveElement>,
     onClick: () -> Unit
 ) {
-    val isLive = fixture.started == true && !fixture.finished
-    val isFinished = fixture.finished
+    val isLive = fixture.started == true && !fixture.finished && !fixture.finishedProvisional
+    val isFinished = fixture.finished || fixture.finishedProvisional
 
     // For live games show live score from fixture (API updates scores directly)
     val homeScore = fixture.teamHScore
@@ -442,8 +442,8 @@ fun FixtureDetailDialog(
     liveElements: List<LiveElement>,
     onDismiss: () -> Unit
 ) {
-    val isLive = fixture.started == true && !fixture.finished
-    val isFinished = fixture.finished
+    val isLive = fixture.started == true && !fixture.finished && !fixture.finishedProvisional
+    val isFinished = fixture.finished || fixture.finishedProvisional
 
     Dialog(
         onDismissRequest = onDismiss,

@@ -1143,7 +1143,7 @@ fun PlayerListRow(
                 text = statusText,
                 fontSize = 12.sp,
                 color = statusColor,
-                fontWeight = if (fixture?.started == true && fixture.finished.not()) FontWeight.Bold else FontWeight.Normal,
+                fontWeight = if (fixture?.started == true && fixture.finished.not() && fixture.finishedProvisional.not()) FontWeight.Bold else FontWeight.Normal,
                 modifier = Modifier.width(56.dp),
                 textAlign = TextAlign.Center
             )

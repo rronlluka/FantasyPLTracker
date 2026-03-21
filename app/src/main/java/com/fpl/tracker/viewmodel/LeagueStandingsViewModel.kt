@@ -270,10 +270,9 @@ class LeagueStandingsViewModel : ViewModel() {
                     it.started == true && it.finished == false && it.finishedProvisional == false
                 }
                 
-                // All fixtures with live data (started but not finished by FPL)
-                // API will tell us if bonus is ready via the bonus field
+                // All fixtures with live data (truly in progress — not finished or provisional)
                 val fixturesNeedingBonus = fixtures.filter {
-                    it.started == true && it.finished == false
+                    it.started == true && it.finished == false && it.finishedProvisional == false
                 }
                 
                 Log.d("LeagueStandings", "Truly live fixtures: ${liveFixtures.size}")
@@ -424,6 +423,9 @@ class LeagueStandingsViewModel : ViewModel() {
                                         bootstrap.elements.find { it.id == pick.element }
                                     }
 
+                                    // Track live-only points separately so the diff is accurate
+                                    var liveOnlyPoints = 0
+
                                     scoringPlayerIds.forEach { playerId ->
                                         val player = bootstrap.elements.find { it.id == playerId }
                                         if (player != null) {
@@ -435,8 +437,8 @@ class LeagueStandingsViewModel : ViewModel() {
                                             // multiplier from API already handles TC (3), normal captain (2), bench boost bench players (1)
                                             val multiplier = pick?.multiplier ?: 1
 
-                                            // Use live data if game started but not finished by FPL
-                                            val shouldUseLiveData = fixture?.started == true && fixture.finished == false
+                                            // Use live data only if game is truly in progress (started, not finished, not finishedProvisional)
+                                            val shouldUseLiveData = fixture?.started == true && fixture.finished == false && fixture.finishedProvisional == false
 
                                             var playerPoints = 0
 
@@ -456,6 +458,7 @@ class LeagueStandingsViewModel : ViewModel() {
                                                     }
 
                                                     Log.d("LeagueStandings", "${standing.entryName} - ${player.webName}: ${playerPoints}pts × ${multiplier} = ${playerPoints * multiplier} (live${if (isBenchBoost && (pick?.position ?: 0) > 11) "/BB" else ""})")
+                                                    liveOnlyPoints += playerPoints * multiplier
                                                 } else {
                                                     playerPoints = player.eventPoints
                                                 }
@@ -469,9 +472,10 @@ class LeagueStandingsViewModel : ViewModel() {
                                         }
                                     }
 
-                                    // Use the higher of calculated vs API reported (in case API hasn't updated)
+                                    // livePointsDiff is ONLY the points from truly in-progress games.
+                                    // This avoids inflating the diff when standing.eventTotal is stale.
                                     val finalGwPoints = maxOf(calculatedGwPoints, standing.eventTotal)
-                                    val livePointsDiff = calculatedGwPoints - standing.eventTotal
+                                    val livePointsDiff = liveOnlyPoints
 
                                     Log.d("LeagueStandings", "Manager ${standing.entryName}: Calculated=$calculatedGwPoints, API=${standing.eventTotal}, Using=$finalGwPoints (diff=$livePointsDiff, chip=$activeChip)")
 

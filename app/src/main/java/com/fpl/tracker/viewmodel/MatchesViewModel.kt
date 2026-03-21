@@ -96,7 +96,7 @@ class MatchesViewModel : ViewModel() {
             return
         }
 
-        val hasLiveGames = fixtures.any { it.started == true && !it.finished }
+        val hasLiveGames = fixtures.any { it.started == true && !it.finished && !it.finishedProvisional }
         val liveElements = if (hasLiveGames || fixtures.any { it.started == true }) {
             repository.getLiveGameweek(eventId).getOrNull()?.elements ?: emptyList()
         } else {
@@ -131,7 +131,7 @@ class MatchesViewModel : ViewModel() {
             return
         }
 
-        val hasLiveGames = fixtures.any { it.started == true && !it.finished }
+        val hasLiveGames = fixtures.any { it.started == true && !it.finished && !it.finishedProvisional }
         val liveElements = if (hasLiveGames || fixtures.any { it.started == true }) {
             repository.getLiveGameweek(eventId).getOrNull()?.elements ?: emptyList()
         } else {

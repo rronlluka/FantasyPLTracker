@@ -103,7 +103,7 @@ class ManagerFormationViewModel : ViewModel() {
                     //   - historical GW: fixture is finished, so use live API data (which is already
                     //     loaded for the correct eventId) whenever liveStats are available
                     val isLive = isTrulyLive
-                    val hasLivePoints = (fixture?.started == true && fixture.finished == false)
+                    val hasLivePoints = (fixture?.started == true && fixture.finished == false && fixture.finishedProvisional == false)
                         || (fixture?.finished == true && liveStats != null)
                     val hasPlayed = fixture?.finished == true
                     
@@ -128,9 +128,9 @@ class ManagerFormationViewModel : ViewModel() {
                     }
                     
                     val fixturesNeedingBonus = fixtures.filter {
-                        it.started == true && it.finished == false
+                        it.started == true && it.finished == false && it.finishedProvisional == false
                     }
-                    
+
                     Log.d("FormationBonus", "Fixtures with live data: ${fixturesNeedingBonus.size} (Truly live: ${liveFixtures.size})")
                     
                     fixturesNeedingBonus.forEach { fixture ->

@@ -89,9 +89,9 @@ class ManagerStatsViewModel : ViewModel() {
                         it.started == true && it.finished == false && it.finishedProvisional == false
                     }
                     
-                    // All fixtures with live data (started but not finished by FPL)
+                    // All fixtures with live data (started but not finished by FPL, not in provisional state)
                     val fixturesNeedingBonus = fixtures.filter {
-                        it.started == true && it.finished == false
+                        it.started == true && it.finished == false && it.finishedProvisional == false
                     }
                     
                     Log.d("ManagerStats", "Truly live fixtures: ${liveFixtures.size}")
@@ -144,8 +144,8 @@ class ManagerStatsViewModel : ViewModel() {
                                 it.teamH == player.team || it.teamA == player.team 
                             }
                             
-                            // Use live data if game started but not finished by FPL
-                            val shouldCountLivePoints = fixture?.started == true && fixture.finished == false
+                            // Use live data only if game is truly in progress (not provisional/finished)
+                            val shouldCountLivePoints = fixture?.started == true && fixture.finished == false && fixture.finishedProvisional == false
                             
                             if (shouldCountLivePoints) {
                                 val liveStats = liveGameweek.elements.find { it.id == playerId }
