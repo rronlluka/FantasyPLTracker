@@ -32,8 +32,6 @@ import com.fpl.tracker.data.models.RankChange
 import com.fpl.tracker.data.models.StandingEntry
 import com.fpl.tracker.data.preferences.PreferencesManager
 import com.fpl.tracker.navigation.Screen
-import com.fpl.tracker.ui.theme.CelestialPurple
-import com.fpl.tracker.ui.theme.FrostedLilac
 import com.fpl.tracker.viewmodel.LeagueStandingsViewModel
 import com.fpl.tracker.viewmodel.ManagerLiveData
 import com.fpl.tracker.viewmodel.UsedChip
@@ -143,10 +141,10 @@ fun EnhancedLeagueStandingsScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = CelestialPurple,
-                    titleContentColor = FrostedLilac,
-                    navigationIconContentColor = FrostedLilac,
-                    actionIconContentColor = FrostedLilac
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    titleContentColor = MaterialTheme.colorScheme.onSurface,
+                    navigationIconContentColor = MaterialTheme.colorScheme.onSurface,
+                    actionIconContentColor = MaterialTheme.colorScheme.onSurface
                 )
             )
         }

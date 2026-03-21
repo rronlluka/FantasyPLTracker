@@ -16,8 +16,6 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.fpl.tracker.data.models.StandingEntry
 import com.fpl.tracker.navigation.Screen
-import com.fpl.tracker.ui.theme.CelestialPurple
-import com.fpl.tracker.ui.theme.FrostedLilac
 import com.fpl.tracker.viewmodel.LeagueStandingsViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -43,8 +41,8 @@ fun LeagueStandingsScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = CelestialPurple,
-                    titleContentColor = FrostedLilac
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    titleContentColor = MaterialTheme.colorScheme.onSurface
                 )
             )
         }

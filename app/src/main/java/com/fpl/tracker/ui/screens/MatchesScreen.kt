@@ -32,12 +32,9 @@ import com.fpl.tracker.data.models.Fixture
 import com.fpl.tracker.data.models.LiveElement
 import com.fpl.tracker.data.models.Player
 import com.fpl.tracker.data.models.Team
-import com.fpl.tracker.ui.theme.CelestialPurple
-import com.fpl.tracker.ui.theme.FrostedLilac
 import com.fpl.tracker.viewmodel.MatchesViewModel
 
 // FPL brand colours
-private val FplPurple = CelestialPurple
 private val FplGreen = Color(0xFF00FF87)
 private val FplLiveRed = Color(0xFFE90052)
 
@@ -114,7 +111,7 @@ fun MatchesScreen(
                     Icon(
                         Icons.Default.Refresh,
                         contentDescription = "Refresh",
-                        tint = FrostedLilac
+                        tint = MaterialTheme.colorScheme.onSurface
                     )
                 }
             }
@@ -462,7 +459,7 @@ fun FixtureDetailDialog(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(FplPurple)
+                        .background(MaterialTheme.colorScheme.surface)
                         .padding(horizontal = 16.dp, vertical = 12.dp)
                 ) {
                     if (isLive) {
@@ -522,7 +519,7 @@ fun FixtureDetailDialog(
                                 homeTeam?.name ?: "Home",
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 15.sp,
-                                color = FplPurple,
+                                color = MaterialTheme.colorScheme.surface,
                                 textAlign = TextAlign.Center,
                                 maxLines = 2
                             )
@@ -540,7 +537,7 @@ fun FixtureDetailDialog(
                                     "${fixture.teamHScore ?: 0}  –  ${fixture.teamAScore ?: 0}",
                                     fontSize = 36.sp,
                                     fontWeight = FontWeight.ExtraBold,
-                                    color = if (isLive) FplLiveRed else FplPurple
+                                    color = if (isLive) FplLiveRed else MaterialTheme.colorScheme.surface
                                 )
                             } else {
                                 Text(
@@ -551,7 +548,7 @@ fun FixtureDetailDialog(
                                 fixture.kickoffTime?.let { kt ->
                                     val time = kt.substringAfter("T").take(5)
                                     val date = kt.substringBefore("T")
-                                    Text(time, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = FplPurple)
+                                    Text(time, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.surface)
                                     Text(date, fontSize = 12.sp, color = Color.Gray)
                                 }
                             }
@@ -566,7 +563,7 @@ fun FixtureDetailDialog(
                                 awayTeam?.name ?: "Away",
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 15.sp,
-                                color = FplPurple,
+                                color = MaterialTheme.colorScheme.surface,
                                 textAlign = TextAlign.Center,
                                 maxLines = 2
                             )
@@ -690,7 +687,7 @@ fun FixtureDetailDialog(
                     Button(
                         onClick = onDismiss,
                         modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(containerColor = FplPurple),
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surface),
                         shape = RoundedCornerShape(10.dp)
                     ) {
                         Text("Close", color = Color.White, fontWeight = FontWeight.SemiBold)
@@ -743,13 +740,13 @@ private fun LivePlayerStatsSection(
         Text(
             homeTeam?.shortName ?: "Home",
             fontWeight = FontWeight.Bold,
-            color = FplPurple,
+            color = MaterialTheme.colorScheme.surface,
             modifier = Modifier.weight(1f)
         )
         Text(
             awayTeam?.shortName ?: "Away",
             fontWeight = FontWeight.Bold,
-            color = FplPurple,
+            color = MaterialTheme.colorScheme.surface,
             textAlign = TextAlign.End,
             modifier = Modifier.weight(1f)
         )
@@ -869,7 +866,7 @@ private fun StatCard(
                     statLabel,
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Bold,
-                    color = FplPurple
+                    color = MaterialTheme.colorScheme.surface
                 )
             }
 
@@ -933,7 +930,7 @@ private fun BpsCard(
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
-            Text("BPS (Bonus Point System)", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = FplPurple)
+            Text("BPS (Bonus Point System)", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.surface)
             Spacer(Modifier.height(8.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),

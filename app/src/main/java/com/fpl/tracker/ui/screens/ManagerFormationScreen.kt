@@ -30,11 +30,7 @@ import android.util.Log
 import com.fpl.tracker.data.repository.FPLRepository
 import com.fpl.tracker.ui.components.FootballPitch
 import com.fpl.tracker.ui.components.PlayerDetailDialog
-import com.fpl.tracker.ui.theme.AuroraTeal
-import com.fpl.tracker.ui.theme.CelestialPurple
-import com.fpl.tracker.ui.theme.EmberRed
-import com.fpl.tracker.ui.theme.FrostedLilac
-import com.fpl.tracker.ui.theme.SolarGold
+
 import com.fpl.tracker.viewmodel.ManagerFormationViewModel
 import com.fpl.tracker.viewmodel.PlayerWithDetails
 import com.fpl.tracker.viewmodel.UsedChip
@@ -89,12 +85,12 @@ fun ManagerFormationScreen(
                             style = MaterialTheme.typography.titleLarge,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
-                            color = FrostedLilac
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
                             text = "GW$eventId",
                             style = MaterialTheme.typography.bodyMedium,
-                            color = FrostedLilac.copy(alpha = 0.8f)
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 },
@@ -104,8 +100,9 @@ fun ManagerFormationScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = CelestialPurple,
-                    titleContentColor = FrostedLilac
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    titleContentColor = MaterialTheme.colorScheme.onSurface,
+                    navigationIconContentColor = MaterialTheme.colorScheme.onSurface
                 )
             )
         }
@@ -160,9 +157,9 @@ fun ManagerFormationScreen(
                         // Summary Card
                         Card(
                             modifier = Modifier.fillMaxWidth(),
-                            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
                             colors = CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.secondaryContainer
+                                containerColor = MaterialTheme.colorScheme.surfaceContainer
                             )
                         ) {
                             // Calculate live points - ONLY for truly live games (not yet finished by FPL)
@@ -225,8 +222,9 @@ fun ManagerFormationScreen(
                         // Additional info
                         Card(
                             modifier = Modifier.fillMaxWidth(),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
                             colors = CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.surfaceVariant
+                                containerColor = MaterialTheme.colorScheme.surfaceContainerLow
                             )
                         ) {
                             Row(
@@ -271,7 +269,7 @@ fun ManagerFormationScreen(
                             ) {
                                 Text(
                                     text = if (isPitchView) "Pitch" else "List",
-                                    color = FrostedLilac,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.Medium
                                 )
@@ -280,10 +278,10 @@ fun ManagerFormationScreen(
                                     checked = isPitchView,
                                     onCheckedChange = { isPitchView = it },
                                     colors = SwitchDefaults.colors(
-                                        checkedThumbColor = FrostedLilac,
-                                        checkedTrackColor = AuroraTeal.copy(alpha = 0.65f),
-                                        uncheckedThumbColor = FrostedLilac.copy(alpha = 0.7f),
-                                        uncheckedTrackColor = FrostedLilac.copy(alpha = 0.3f)
+                                        checkedThumbColor = MaterialTheme.colorScheme.onSurface,
+                                        checkedTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.65f),
+                                        uncheckedThumbColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        uncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant
                                     ),
                                     modifier = Modifier.height(24.dp)
                                 )
@@ -373,7 +371,10 @@ fun ManagerFormationScreen(
                         
                         Card(
                             modifier = Modifier.fillMaxWidth(),
-                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceContainer
+                            )
                         ) {
                             Row(
                                 modifier = Modifier
@@ -403,9 +404,9 @@ fun ManagerFormationScreen(
                             val transferCost = managerPicks.entryHistory.eventTransfersCost
                             Card(
                                 modifier = Modifier.fillMaxWidth(),
-                                elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
+                                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
                                 colors = CardDefaults.cardColors(
-                                    containerColor = Color(0xFF1A0A2E)
+                                    containerColor = MaterialTheme.colorScheme.surfaceContainer
                                 )
                             ) {
                                 Column(modifier = Modifier.padding(16.dp)) {
@@ -419,7 +420,7 @@ fun ManagerFormationScreen(
                                             text = "GW Transfers",
                                             fontWeight = FontWeight.Bold,
                                             fontSize = 16.sp,
-                                            color = FrostedLilac
+                                            color = MaterialTheme.colorScheme.onSurface
                                         )
                                         Row(
                                             verticalAlignment = Alignment.CenterVertically,
@@ -428,7 +429,7 @@ fun ManagerFormationScreen(
                                             Box(
                                                 modifier = Modifier
                                                     .background(
-                                                        CelestialPurple.copy(alpha = 0.7f),
+                                                        MaterialTheme.colorScheme.surfaceVariant,
                                                         RoundedCornerShape(12.dp)
                                                     )
                                                     .padding(horizontal = 8.dp, vertical = 3.dp)
@@ -436,14 +437,14 @@ fun ManagerFormationScreen(
                                                 Text(
                                                     text = "${gwTransfers.size} transfer${if (gwTransfers.size > 1) "s" else ""}",
                                                     fontSize = 11.sp,
-                                                    color = FrostedLilac,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                     fontWeight = FontWeight.SemiBold
                                                 )
                                             }
                                             Box(
                                                 modifier = Modifier
                                                     .background(
-                                                        if (transferCost > 0) EmberRed else AuroraTeal,
+                                                        if (transferCost > 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
                                                         RoundedCornerShape(12.dp)
                                                     )
                                                     .padding(horizontal = 8.dp, vertical = 3.dp)
@@ -469,7 +470,7 @@ fun ManagerFormationScreen(
                                         if (index > 0) {
                                             HorizontalDivider(
                                                 modifier = Modifier.padding(vertical = 10.dp),
-                                                color = FrostedLilac.copy(alpha = 0.12f)
+                                                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
                                             )
                                         }
 
@@ -486,7 +487,7 @@ fun ManagerFormationScreen(
                                                     modifier = Modifier
                                                         .size(40.dp)
                                                         .background(
-                                                            color = if (teamOut != null) com.fpl.tracker.ui.components.getTeamColor(teamOut.id) else EmberRed.copy(alpha = 0.3f),
+                                                            color = if (teamOut != null) com.fpl.tracker.ui.components.getTeamColor(teamOut.id) else MaterialTheme.colorScheme.error.copy(alpha = 0.3f),
                                                             shape = RoundedCornerShape(10.dp)
                                                         ),
                                                     contentAlignment = Alignment.Center
@@ -503,7 +504,7 @@ fun ManagerFormationScreen(
                                                     text = playerOut?.webName ?: "Unknown",
                                                     fontSize = 12.sp,
                                                     fontWeight = FontWeight.SemiBold,
-                                                    color = EmberRed,
+                                                    color = MaterialTheme.colorScheme.error,
                                                     textAlign = TextAlign.Center,
                                                     maxLines = 2,
                                                     overflow = TextOverflow.Ellipsis
@@ -511,7 +512,7 @@ fun ManagerFormationScreen(
                                                 Text(
                                                     text = "£${transfer.elementOutCost / 10.0}m",
                                                     fontSize = 10.sp,
-                                                    color = FrostedLilac.copy(alpha = 0.55f)
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                                 )
                                             }
 
@@ -523,7 +524,7 @@ fun ManagerFormationScreen(
                                             ) {
                                                 Text(
                                                     text = "→",
-                                                    color = SolarGold,
+                                                    color = MaterialTheme.colorScheme.secondary,
                                                     fontSize = 22.sp,
                                                     fontWeight = FontWeight.Bold
                                                 )
@@ -538,7 +539,7 @@ fun ManagerFormationScreen(
                                                     modifier = Modifier
                                                         .size(40.dp)
                                                         .background(
-                                                            color = if (teamIn != null) com.fpl.tracker.ui.components.getTeamColor(teamIn.id) else AuroraTeal.copy(alpha = 0.3f),
+                                                            color = if (teamIn != null) com.fpl.tracker.ui.components.getTeamColor(teamIn.id) else MaterialTheme.colorScheme.primary.copy(alpha = 0.3f),
                                                             shape = RoundedCornerShape(10.dp)
                                                         ),
                                                     contentAlignment = Alignment.Center
@@ -555,7 +556,7 @@ fun ManagerFormationScreen(
                                                     text = playerIn?.webName ?: "Unknown",
                                                     fontSize = 12.sp,
                                                     fontWeight = FontWeight.SemiBold,
-                                                    color = AuroraTeal,
+                                                    color = MaterialTheme.colorScheme.primary,
                                                     textAlign = TextAlign.Center,
                                                     maxLines = 2,
                                                     overflow = TextOverflow.Ellipsis
@@ -563,7 +564,7 @@ fun ManagerFormationScreen(
                                                 Text(
                                                     text = "£${transfer.elementInCost / 10.0}m",
                                                     fontSize = 10.sp,
-                                                    color = FrostedLilac.copy(alpha = 0.55f)
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                                 )
                                             }
                                         }
@@ -697,7 +698,10 @@ fun BenchPlayerCard(
                     } else Modifier
                 ),
             shape = RoundedCornerShape(8.dp),
-            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceContainerHighest
+            )
         ) {
             Column(
                 modifier = Modifier
@@ -794,9 +798,9 @@ private fun ManagerChipsCard(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
         colors = CardDefaults.cardColors(
-            containerColor = Color(0xFF161626)
+            containerColor = MaterialTheme.colorScheme.surfaceContainer
         )
     ) {
         Column(
@@ -811,7 +815,7 @@ private fun ManagerChipsCard(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = "Chips Played",
-                        color = FrostedLilac,
+                        color = MaterialTheme.colorScheme.onSurface,
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Bold
                     )
@@ -821,7 +825,7 @@ private fun ManagerChipsCard(
                         } else {
                             "${usedChips.size} chip${if (usedChips.size == 1) "" else "s"} this season"
                         },
-                        color = FrostedLilac.copy(alpha = 0.68f),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontSize = 12.sp
                     )
                 }
@@ -973,7 +977,7 @@ fun PlayerCard(playerDetail: PlayerWithDetails) {
                     .background(
                         color = when {
                             points > 5 -> MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)
-                            points < 2 -> EmberRed.copy(alpha = 0.3f)
+                            points < 2 -> MaterialTheme.colorScheme.error.copy(alpha = 0.3f)
                             else -> MaterialTheme.colorScheme.surfaceVariant
                         },
                         shape = CircleShape
@@ -1044,7 +1048,7 @@ fun PlayerListRow(
         }
         fixture.started == true -> {
             statusText = "${fixture.minutes}'"
-            statusColor = AuroraTeal
+            statusColor = MaterialTheme.colorScheme.primary
         }
         fixture.kickoffTime != null -> {
             // Parse kickoff time to show e.g. "Sat 15:00"
@@ -1158,7 +1162,7 @@ fun PlayerListRow(
                         color = when {
                             displayPoints >= 10 -> MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
                             displayPoints >= 6  -> MaterialTheme.colorScheme.secondary.copy(alpha = 0.2f)
-                            displayPoints <= 2  -> EmberRed.copy(alpha = 0.2f)
+                            displayPoints <= 2  -> MaterialTheme.colorScheme.error.copy(alpha = 0.2f)
                             else -> MaterialTheme.colorScheme.surfaceVariant
                         },
                         shape = CircleShape

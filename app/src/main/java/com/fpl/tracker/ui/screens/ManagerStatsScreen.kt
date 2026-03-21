@@ -20,8 +20,6 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.fpl.tracker.data.preferences.PreferencesManager
 import com.fpl.tracker.navigation.Screen
-import com.fpl.tracker.ui.theme.CelestialPurple
-import com.fpl.tracker.ui.theme.FrostedLilac
 import com.fpl.tracker.viewmodel.ManagerStatsViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)

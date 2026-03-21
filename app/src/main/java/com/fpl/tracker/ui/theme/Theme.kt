@@ -12,30 +12,23 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 
-private val DarkColorScheme = darkColorScheme(
-    primary = AuroraTeal,
-    secondary = SolarGold,
-    tertiary = CelestialPurple,
-    background = NightSky,
-    surface = Starfield,
-    onPrimary = Color.Black,
-    onSecondary = Color.Black,
-    onTertiary = Color.White,
-    onBackground = FrostedLilac,
-    onSurface = FrostedLilac
-)
-
-private val LightColorScheme = lightColorScheme(
-    primary = CelestialPurple,
-    secondary = AuroraTeal,
-    tertiary = SolarGold,
-    background = FrostedLilac,
-    surface = Color.White,
-    onPrimary = Color.White,
-    onSecondary = Color.Black,
-    onTertiary = Color.Black,
-    onBackground = NightSky,
-    onSurface = NightSky
+private val AthleticColorScheme = darkColorScheme(
+    primary = PrimaryA1D494,
+    onPrimary = OnPrimary0A3909,
+    primaryContainer = PrimaryContainer2D5A27,
+    secondary = SecondaryFFE083,
+    onSecondary = OnSecondary3C2F00,
+    tertiary = TertiaryFFB3AD,
+    tertiaryContainer = TertiaryContainerA40217,
+    background = Background131313,
+    surface = Surface131313,
+    surfaceVariant = SurfaceVariant353535,
+    onBackground = OnSurfaceE5E2E1,
+    onSurface = OnSurfaceE5E2E1,
+    onSurfaceVariant = OnSurfaceVariantC2C9BB,
+    outlineVariant = OutlineVariant42493E,
+    error = ErrorFFB4AB,
+    onError = OnError690005
 )
 
 @Composable
@@ -45,18 +38,8 @@ fun FantasyLiveTrackerTheme(
     dynamicColor: Boolean = false,
     content: @Composable () -> Unit
 ) {
-    val colorScheme = when {
-        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            val context = LocalContext.current
-            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-        }
-
-        darkTheme -> DarkColorScheme
-        else -> LightColorScheme
-    }
-
     MaterialTheme(
-        colorScheme = colorScheme,
+        colorScheme = AthleticColorScheme,
         typography = Typography,
         content = content
     )

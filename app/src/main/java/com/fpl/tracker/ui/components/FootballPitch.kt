@@ -84,11 +84,12 @@ fun FootballPitch(
 
 @Composable
 fun PitchCanvas(modifier: Modifier = Modifier) {
+    val pitchColor = Color(0xFF1ab745) // Vibrant green from screenshot
+    val lineColor = Color.White.copy(alpha = 0.6f)
+
     Canvas(modifier = modifier) {
         val width = size.width
         val height = size.height
-        val pitchColor = Color(0xFF00B050)
-        val lineColor = Color.White
         val strokeWidth = 3f
 
         // Draw pitch background
@@ -253,15 +254,14 @@ fun PlayerCardOnPitch(
     val isCaptain = playerDetail.pick.isCaptain
     val isViceCaptain = playerDetail.pick.isViceCaptain
     
-    // Use live API data if hasLivePoints (live or just finished within 3 hours)
+    // Use live API data if hasLivePoints
     var points = if (playerDetail.hasLivePoints && playerDetail.liveStats != null) {
         playerDetail.liveStats.stats.totalPoints
     } else {
         playerDetail.player.eventPoints
     }
     
-    // Add provisional bonus if player doesn't have bonus yet
-    // (works for both truly live AND just finished games within 3 hours)
+    // Add provisional bonus
     if (playerDetail.hasLivePoints && playerDetail.liveStats != null) {
         val currentBonus = playerDetail.liveStats.stats.bonus
         val provisionalBonusPoints = provisionalBonus[playerDetail.player.id] ?: 0
@@ -272,11 +272,6 @@ fun PlayerCardOnPitch(
     
     val displayPoints = points * playerDetail.pick.multiplier
     
-    // Get stats from live data
-    val goals = playerDetail.liveStats?.stats?.goalsScored ?: 0
-    val assists = playerDetail.liveStats?.stats?.assists ?: 0
-    
-    // Pulsing animation for live players
     val infiniteTransition = rememberInfiniteTransition(label = "live")
     val alpha by infiniteTransition.animateFloat(
         initialValue = 0.3f,
@@ -290,15 +285,15 @@ fun PlayerCardOnPitch(
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.width(68.dp)
+        modifier = Modifier.width(62.dp)
     ) {
         // Captain/Vice-Captain badge OR Live indicator
         if (isCaptain || isViceCaptain) {
             Box(
                 modifier = Modifier
-                    .size(20.dp)
+                    .size(18.dp)
                     .background(
-                        color = if (isCaptain) MaterialTheme.colorScheme.primary else Color(0xFF666666),
+                        color = Color(0xFF6B4EE6), // Purple from screenshot 16
                         shape = CircleShape
                     ),
                 contentAlignment = Alignment.Center
@@ -315,12 +310,12 @@ fun PlayerCardOnPitch(
         } else if (playerDetail.isLive) {
             Box(
                 modifier = Modifier
-                    .height(18.dp)
+                    .height(16.dp)
                     .background(
-                        color = Color(0xFFFF0000).copy(alpha = alpha),
+                        color = Color(0xFFB44B3E).copy(alpha = alpha),
                         shape = RoundedCornerShape(4.dp)
                     )
-                    .padding(horizontal = 8.dp),
+                    .padding(horizontal = 6.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
@@ -328,145 +323,89 @@ fun PlayerCardOnPitch(
                     color = Color.White,
                     fontSize = 8.sp,
                     fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.align(Alignment.Center)
+                    textAlign = TextAlign.Center
                 )
             }
             Spacer(modifier = Modifier.height(4.dp))
         } else {
-            Spacer(modifier = Modifier.height(22.dp))
+            Spacer(modifier = Modifier.height(20.dp))
         }
 
-        // Player card with border for live players
+        // White card matching screenshot 16
         Card(
             modifier = Modifier
-                .width(68.dp)
-                .height(92.dp)
-                .clickable { onPlayerClick?.invoke(playerDetail) }
-                .then(
-                    if (playerDetail.isLive) {
-                        Modifier.border(
-                            width = 2.dp,
-                            color = Color(0xFFFF0000).copy(alpha = alpha),
-                            shape = RoundedCornerShape(8.dp)
-                        )
-                    } else Modifier
-                ),
+                .width(62.dp)
+                .clickable { onPlayerClick?.invoke(playerDetail) },
             shape = RoundedCornerShape(8.dp),
-            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
             colors = CardDefaults.cardColors(
                 containerColor = Color.White
             )
         ) {
             Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(4.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.SpaceBetween
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Jersey/Shirt representation
+                // Top: Team Background
                 Box(
                     modifier = Modifier
-                        .size(30.dp)
-                        .background(
-                            color = getTeamColor(playerDetail.team.id),
-                            shape = RoundedCornerShape(4.dp)
-                        ),
+                        .fillMaxWidth()
+                        .background(color = getTeamColor(playerDetail.team.id))
+                        .padding(vertical = 4.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
                         text = playerDetail.team.shortName.take(3).uppercase(),
                         color = getTeamTextColor(playerDetail.team.id),
-                        fontSize = 7.sp,
-                        fontWeight = FontWeight.Bold,
-                        textAlign = TextAlign.Center
+                        fontSize = 8.sp,
+                        fontWeight = FontWeight.Bold
                     )
                 }
 
-                // Player name
+                // Middle: Player Name
                 Text(
                     text = playerDetail.player.webName,
-                    fontSize = 8.5.sp,
-                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Medium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     color = Color.Black,
-                    textAlign = TextAlign.Center
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp, horizontal = 2.dp)
                 )
 
-                // Points with goals/assists
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally
+                // Bottom: Points Pill
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 4.dp)
+                        .padding(bottom = 6.dp)
+                        .background(
+                            color = when {
+                                displayPoints >= 10 -> Color(0xFFC8E6C9) // Green pill for high points
+                                displayPoints >= 6 -> Color(0xFFBBDEFB)  // Blue pill for avg
+                                displayPoints <= 2 -> Color(0xFFFFCDD2)  // Pink pill for blank
+                                else -> Color(0xFFF5F5F5)                // Neutral pill
+                            },
+                            shape = RoundedCornerShape(4.dp)
+                        )
+                        .padding(vertical = 3.dp),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(
-                                color = when {
-                                    displayPoints >= 10 -> Color(0xFF00FF87).copy(alpha = 0.3f)
-                                    displayPoints >= 6 -> Color(0xFF4CAF50).copy(alpha = 0.3f)
-                                    displayPoints <= 2 -> Color(0xFFFF5555).copy(alpha = 0.3f)
-                                    else -> Color(0xFFF0F0F0)
-                                },
-                                shape = RoundedCornerShape(4.dp)
-                            )
-                            .padding(vertical = 2.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "$displayPoints pts",
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.Black
-                        )
-                    }
-                    
-                    // Goals and Assists row
-                    if (goals > 0 || assists > 0) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.Center,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            if (goals > 0) {
-                                Text(
-                                    text = "⚽$goals",
-                                    fontSize = 8.sp,
-                                    color = Color.Black
-                                )
-                            }
-                            if (goals > 0 && assists > 0) {
-                                Text(
-                                    text = " ",
-                                    fontSize = 8.sp
-                                )
-                            }
-                            if (assists > 0) {
-                                Text(
-                                    text = "🅰️$assists",
-                                    fontSize = 8.sp,
-                                    color = Color.Black
-                                )
-                            }
-                        }
-                    }
-                    
-                    // Opponent team (always show when available)
-                    playerDetail.opponentTeam?.let { opponent ->
-                        val isHome = playerDetail.fixture?.teamH == playerDetail.team.id
-                        Text(
-                            text = "${if (isHome) "vs" else "@"} ${opponent.shortName}",
-                            fontSize = 7.sp,
-                            color = Color.Gray,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            textAlign = TextAlign.Center
-                        )
-                    }
+                    Text(
+                        text = "$displayPoints pts",
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.Black
+                    )
                 }
             }
         }
+        
+        // Minor spacing at bottom
+        Spacer(modifier = Modifier.height(4.dp))
     }
 }
 
