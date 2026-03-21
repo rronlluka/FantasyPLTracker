@@ -1,13 +1,19 @@
 package com.fpl.tracker.ui.screens
 
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -16,11 +22,15 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -32,25 +42,54 @@ import com.fpl.tracker.data.models.RankChange
 import com.fpl.tracker.data.models.StandingEntry
 import com.fpl.tracker.data.preferences.PreferencesManager
 import com.fpl.tracker.navigation.Screen
+import com.fpl.tracker.ui.theme.SpaceGrotesk
+import com.fpl.tracker.ui.theme.Manrope
 import com.fpl.tracker.viewmodel.LeagueStandingsViewModel
 import com.fpl.tracker.viewmodel.ManagerLiveData
 import com.fpl.tracker.viewmodel.UsedChip
+import java.text.NumberFormat
+import java.util.Locale
 
-// ─── Chip colour palette ─────────────────────────────────────────────────────
-private val ChipBenchBoost = Color(0xFF00C853)
-private val ChipWildcard   = Color(0xFF2979FF)
-private val ChipTripleCap  = Color(0xFFFFD600)
-private val ChipFreeHit    = Color(0xFFFF6D00)
+// ─── Stitch colour palette ───────────────────────────────────────────────────
+private val PitchGreen        = Color(0xFFA1D494)
+private val PitchGreenDark    = Color(0xFF2D5A27)
+private val GoldSecondary     = Color(0xFFFFE083)
+private val SurfaceBg         = Color(0xFF131313)
+private val SurfaceContLow    = Color(0xFF1C1B1B)
+private val SurfaceCont       = Color(0xFF20201F)
+private val SurfaceContHigh   = Color(0xFF2A2A2A)
+private val OnSurface         = Color(0xFFE5E2E1)
+private val OnSurfaceVariant  = Color(0xFFC2C9BB)
+private val OutlineVar        = Color(0xFF42493E)
+private val TertiaryRed       = Color(0xFFA40217)
+
+private val ChipBenchBoost = Color(0xFFFFE083)
+private val ChipWildcard   = Color(0xFF2D5A27)
+private val ChipTripleCap  = Color(0xFF353535)
+private val ChipFreeHit    = Color(0xFFA40217)
+
+private val ChipBBText = Color(0xFF3C2F00)
+private val ChipWCText = Color(0xFFA1D494)
+private val ChipTCText = Color.White
+private val ChipFHText = Color(0xFFFFDAD7)
 
 fun chipLabel(chip: String?, number: Int): String? {
     val n = number.coerceIn(1, 2)
     return when (chip) {
-        "bboost"   -> "BB$n"
+        "bboost"   -> if (n > 1) "BB$n" else "BB"
         "wildcard" -> "WC$n"
-        "3xc"      -> "TC$n"
-        "freehit"  -> "FH$n"
+        "3xc"      -> if (n > 1) "TC$n" else "TC"
+        "freehit"  -> if (n > 1) "FH$n" else "FH"
         else       -> null
     }
+}
+
+fun chipShortLabel(chip: String?): String = when (chip) {
+    "bboost"   -> "BB"
+    "wildcard" -> "WC"
+    "3xc"      -> "TC"
+    "freehit"  -> "FH"
+    else       -> "?"
 }
 
 fun chipColor(chip: String?): Color = when (chip) {
@@ -61,7 +100,16 @@ fun chipColor(chip: String?): Color = when (chip) {
     else       -> Color.Gray
 }
 
-fun chipTextColor(chip: String?): Color = if (chip == "3xc") Color.Black else Color.White
+fun chipTextColor(chip: String?): Color = when (chip) {
+    "bboost"   -> ChipBBText
+    "wildcard" -> ChipWCText
+    "3xc"      -> ChipTCText
+    "freehit"  -> ChipFHText
+    else       -> Color.White
+}
+
+private fun formatTotal(n: Int): String =
+    NumberFormat.getNumberInstance(Locale.getDefault()).format(n)
 
 // ─── Screen ──────────────────────────────────────────────────────────────────
 
@@ -82,8 +130,6 @@ fun EnhancedLeagueStandingsScreen(
     var showFavoriteDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(leagueId) {
-        // Only load if we haven't already loaded data for this league.
-        // This prevents back-navigation from resetting a selected historical GW.
         if (uiState.leagueStandings == null) {
             viewModel.loadLeagueStandings(leagueId)
         }
@@ -93,28 +139,31 @@ fun EnhancedLeagueStandingsScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Text(
-                        text = uiState.leagueStandings?.league?.name ?: "League",
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        fontWeight = FontWeight.Bold
-                    )
+                    Column {
+                        Text(
+                            text = "PITCH-SIDE GALLERY",
+                            fontFamily = SpaceGrotesk,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 16.sp,
+                            letterSpacing = 1.sp,
+                            color = PitchGreen,
+                            maxLines = 1
+                        )
+                    }
                 },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = PitchGreen)
                     }
                 },
                 actions = {
-                    // Chip history toggle
                     IconButton(onClick = { viewModel.toggleChipHistory() }) {
                         Icon(
                             Icons.Filled.Style,
                             contentDescription = if (uiState.showChipHistory) "Back to Rankings" else "Chip History",
-                            tint = if (uiState.showChipHistory) Color(0xFF00FF87) else Color.White
+                            tint = if (uiState.showChipHistory) PitchGreen else OnSurfaceVariant
                         )
                     }
-                    // Favourite toggle
                     IconButton(onClick = {
                         if (isFavorite) {
                             prefsManager.removeFavoriteLeague()
@@ -130,21 +179,20 @@ fun EnhancedLeagueStandingsScreen(
                         Icon(
                             if (isFavorite) Icons.Filled.Star else Icons.Filled.StarBorder,
                             contentDescription = "Favourite",
-                            tint = if (isFavorite) Color(0xFFFFD700) else Color.White
+                            tint = if (isFavorite) GoldSecondary else OnSurfaceVariant
                         )
                     }
-                    // Refresh
                     IconButton(onClick = {
                         viewModel.loadLeagueStandings(leagueId, uiState.selectedGameweek)
                     }) {
-                        Icon(Icons.Filled.Refresh, "Refresh")
+                        Icon(Icons.Filled.Refresh, "Refresh", tint = OnSurfaceVariant)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface,
-                    titleContentColor = MaterialTheme.colorScheme.onSurface,
-                    navigationIconContentColor = MaterialTheme.colorScheme.onSurface,
-                    actionIconContentColor = MaterialTheme.colorScheme.onSurface
+                    containerColor = SurfaceBg,
+                    titleContentColor = OnSurface,
+                    navigationIconContentColor = PitchGreen,
+                    actionIconContentColor = OnSurfaceVariant
                 )
             )
         }
@@ -153,7 +201,7 @@ fun EnhancedLeagueStandingsScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .background(Color(0xFF121212))
+                .background(SurfaceBg)
         ) {
             when {
                 uiState.isLoading -> LoadingState()
@@ -164,7 +212,6 @@ fun EnhancedLeagueStandingsScreen(
                 )
 
                 uiState.leagueStandings != null -> {
-                    // liveRankings is used for BOTH live re-ranking AND historical corrected standings
                     val isHistorical = uiState.selectedGameweek != null
                     val standings = if (uiState.liveRankings.isNotEmpty())
                         uiState.liveRankings
@@ -179,7 +226,8 @@ fun EnhancedLeagueStandingsScreen(
                             currentEvent    = uiState.currentEvent,
                             userEntryId     = prefsManager.getManagerId()?.toInt(),
                             leagueId        = leagueId,
-                            prefsManager    = prefsManager
+                            prefsManager    = prefsManager,
+                            leagueName      = uiState.leagueStandings!!.league.name
                         )
                     } else {
                         NormalRankingsView(
@@ -195,8 +243,6 @@ fun EnhancedLeagueStandingsScreen(
                             onClearGameweek    = { viewModel.clearGameweekSelection() },
                             onRowClick         = { standing ->
                                 val gwForNav = uiState.selectedGameweek ?: uiState.currentEvent
-                                // Persist the league ID so ManagerFormationScreen can fetch
-                                // league-wide player stats (Starts/Bench tabs) correctly.
                                 prefsManager.saveLeagueId(leagueId)
                                 navController.navigate(
                                     Screen.ManagerFormation.createRoute(
@@ -240,31 +286,99 @@ private fun BoxScope.LoadingState() {
         modifier = Modifier.align(Alignment.Center),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        CircularProgressIndicator(color = Color(0xFF00FF87))
+        CircularProgressIndicator(color = PitchGreen)
         Spacer(modifier = Modifier.height(12.dp))
-        Text("Loading standings…", color = Color(0xFF9E9E9E), fontSize = 14.sp)
+        Text(
+            "Loading standings…",
+            color = OnSurfaceVariant,
+            fontSize = 14.sp,
+            fontFamily = Manrope
+        )
     }
 }
 
 @Composable
 private fun BoxScope.ErrorState(message: String, onRetry: () -> Unit) {
     Column(
-        modifier = Modifier.align(Alignment.Center).padding(24.dp),
+        modifier = Modifier
+            .align(Alignment.Center)
+            .padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Icon(Icons.Filled.Warning, null, tint = Color(0xFFFF5555), modifier = Modifier.size(48.dp))
+        Icon(Icons.Filled.Warning, null, tint = Color(0xFFFFB4AB), modifier = Modifier.size(48.dp))
         Spacer(modifier = Modifier.height(12.dp))
-        Text("Failed to load standings", color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+        Text(
+            "Failed to load standings",
+            color = OnSurface,
+            fontWeight = FontWeight.SemiBold,
+            fontSize = 16.sp,
+            fontFamily = SpaceGrotesk
+        )
         Spacer(modifier = Modifier.height(4.dp))
-        Text(message, color = Color(0xFF9E9E9E), fontSize = 13.sp, textAlign = TextAlign.Center)
+        Text(message, color = OnSurfaceVariant, fontSize = 13.sp, textAlign = TextAlign.Center, fontFamily = Manrope)
         Spacer(modifier = Modifier.height(20.dp))
-        Button(onClick = onRetry, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00FF87))) {
-            Text("Retry", color = Color.Black, fontWeight = FontWeight.Bold)
+        Button(
+            onClick = onRetry,
+            colors = ButtonDefaults.buttonColors(containerColor = PitchGreen),
+            shape = RoundedCornerShape(8.dp)
+        ) {
+            Text("Retry", color = Color(0xFF0A3909), fontWeight = FontWeight.Bold, fontFamily = Manrope)
         }
     }
 }
 
-// ─── Gameweek selector ────────────────────────────────────────────────────────
+// ─── Live Status Bar ─────────────────────────────────────────────────────────
+
+@Composable
+private fun LiveStatusBar(currentEvent: Int) {
+    val infiniteTransition = rememberInfiniteTransition(label = "pulse")
+    val alpha by infiniteTransition.animateFloat(
+        initialValue = 1f,
+        targetValue = 0.3f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(800),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "pulseAlpha"
+    )
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(SurfaceContLow)
+            .padding(horizontal = 16.dp, vertical = 10.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                modifier = Modifier
+                    .size(10.dp)
+                    .alpha(alpha)
+                    .clip(CircleShape)
+                    .background(TertiaryRed)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                "LIVE MATCHDAY STATUS",
+                fontFamily = SpaceGrotesk,
+                fontWeight = FontWeight.Bold,
+                fontSize = 11.sp,
+                letterSpacing = 1.5.sp,
+                color = Color(0xFFFFB3AD)
+            )
+        }
+        Text(
+            "GW $currentEvent \u2022 ACTIVE",
+            fontFamily = Manrope,
+            fontSize = 10.sp,
+            letterSpacing = 0.5.sp,
+            color = OnSurfaceVariant
+        )
+    }
+}
+
+// ─── Gameweek selector ───────────────────────────────────────────────────────
 
 @Composable
 private fun GameweekSelector(
@@ -282,46 +396,47 @@ private fun GameweekSelector(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(Color(0xFF181818))
-                .padding(horizontal = 12.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .padding(horizontal = 20.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Text(
                 "Standings after:",
-                color = Color(0xFF9E9E9E),
-                fontSize = 12.sp,
-                modifier = Modifier.weight(1f)
+                color = OnSurfaceVariant,
+                fontSize = 10.sp,
+                fontFamily = Manrope,
+                fontWeight = FontWeight.Medium,
+                letterSpacing = 0.5.sp
             )
 
-            // Dropdown button
             Box {
-                OutlinedButton(
-                    onClick = { expanded = true },
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
-                    border = BorderStroke(
-                        width = 1.dp,
-                        color = if (isHistorical) Color(0xFF00FF87) else Color(0xFF444444)
-                    ),
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
-                    modifier = Modifier.height(36.dp)
-                ) {
-                    if (isHistorical) {
-                        Box(
-                            modifier = Modifier
-                                .size(6.dp)
-                                .clip(RoundedCornerShape(50))
-                                .background(Color(0xFF00FF87))
+                Row(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(50))
+                        .background(SurfaceContHigh)
+                        .border(
+                            width = 1.dp,
+                            color = if (isHistorical) PitchGreen.copy(alpha = 0.5f) else OutlineVar.copy(alpha = 0.3f),
+                            shape = RoundedCornerShape(50)
                         )
-                        Spacer(modifier = Modifier.width(6.dp))
-                    }
+                        .clickable { expanded = true }
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     Text(
                         "GW $displayGw",
-                        fontWeight = if (isHistorical) FontWeight.Bold else FontWeight.Normal,
-                        color = if (isHistorical) Color(0xFF00FF87) else Color.White,
-                        fontSize = 13.sp
+                        fontFamily = SpaceGrotesk,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isHistorical) PitchGreen else OnSurface,
+                        fontSize = 14.sp
                     )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Icon(Icons.Filled.ArrowDropDown, null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Icon(
+                        Icons.Filled.ExpandMore,
+                        null,
+                        modifier = Modifier.size(18.dp),
+                        tint = OnSurfaceVariant
+                    )
                 }
 
                 DropdownMenu(
@@ -329,50 +444,50 @@ private fun GameweekSelector(
                     onDismissRequest = { expanded = false },
                     modifier = Modifier
                         .heightIn(max = 300.dp)
-                        .background(Color(0xFF1E1E1E))
+                        .background(SurfaceCont)
                 ) {
-                    // "Live / Current" option at the top
                     DropdownMenuItem(
                         text = {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Icon(
                                     Icons.Filled.Bolt,
                                     contentDescription = null,
-                                    tint = Color(0xFF00FF87),
+                                    tint = PitchGreen,
                                     modifier = Modifier.size(14.dp)
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text(
                                     "GW $currentEvent (Live)",
-                                    color = Color(0xFF00FF87),
+                                    color = PitchGreen,
                                     fontWeight = FontWeight.SemiBold,
-                                    fontSize = 13.sp
+                                    fontSize = 13.sp,
+                                    fontFamily = SpaceGrotesk
                                 )
                             }
                         },
                         onClick = { onClearGameweek(); expanded = false },
                         modifier = Modifier.background(
-                            if (selectedGameweek == null) Color(0xFF2A2A2A) else Color.Transparent
+                            if (selectedGameweek == null) SurfaceContHigh else Color.Transparent
                         )
                     )
 
-                    HorizontalDivider(color = Color(0xFF333333), thickness = 0.5.dp)
+                    HorizontalDivider(color = OutlineVar.copy(alpha = 0.3f), thickness = 0.5.dp)
 
-                    // All past GWs newest first
                     availableGameweeks.reversed().forEach { gw ->
-                        if (gw == currentEvent) return@forEach  // Already shown above
+                        if (gw == currentEvent) return@forEach
                         DropdownMenuItem(
                             text = {
                                 Text(
                                     "GW $gw",
-                                    color = if (gw == selectedGameweek) Color(0xFF90CAF9) else Color.White,
+                                    color = if (gw == selectedGameweek) PitchGreen else OnSurface,
                                     fontWeight = if (gw == selectedGameweek) FontWeight.Bold else FontWeight.Normal,
-                                    fontSize = 13.sp
+                                    fontSize = 13.sp,
+                                    fontFamily = SpaceGrotesk
                                 )
                             },
                             onClick = { onGameweekSelected(gw); expanded = false },
                             modifier = Modifier.background(
-                                if (gw == selectedGameweek) Color(0xFF1A2744) else Color.Transparent
+                                if (gw == selectedGameweek) PitchGreenDark.copy(alpha = 0.3f) else Color.Transparent
                             )
                         )
                     }
@@ -380,42 +495,40 @@ private fun GameweekSelector(
             }
         }
 
-        // Historical banner shown when a past GW is selected
         if (isHistorical) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(Color(0xFF1A2744))
-                    .padding(horizontal = 12.dp, vertical = 7.dp),
+                    .background(PitchGreenDark.copy(alpha = 0.25f))
+                    .padding(horizontal = 16.dp, vertical = 7.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Icon(
                     Icons.Filled.History,
                     contentDescription = null,
-                    tint = Color(0xFF90CAF9),
+                    tint = PitchGreen,
                     modifier = Modifier.size(14.dp)
                 )
                 Spacer(modifier = Modifier.width(6.dp))
                 Text(
-                    "Historical view — standings as of end of GW $selectedGameweek",
-                    color = Color(0xFF90CAF9),
+                    "Historical view \u2014 standings as of end of GW $selectedGameweek",
+                    color = PitchGreen,
                     fontSize = 11.sp,
+                    fontFamily = Manrope,
                     modifier = Modifier.weight(1f)
                 )
                 TextButton(
                     onClick = onClearGameweek,
                     contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
                 ) {
-                    Text("Live", color = Color(0xFF00FF87), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    Text("Live", color = GoldSecondary, fontSize = 11.sp, fontWeight = FontWeight.Bold, fontFamily = SpaceGrotesk)
                 }
             }
         }
-
-        HorizontalDivider(color = Color(0xFF2D2D2D))
     }
 }
 
-// ─── Normal rankings view ────────────────────────────────────────────────────
+// ─── Normal Rankings View ────────────────────────────────────────────────────
 
 @Composable
 private fun NormalRankingsView(
@@ -431,61 +544,60 @@ private fun NormalRankingsView(
     onClearGameweek: () -> Unit,
     onRowClick: (StandingEntry) -> Unit
 ) {
-    // selectedGameweek is only non-null for historical GWs (VM sets it null for current GW)
     val isHistorical = selectedGameweek != null
     val displayGw    = selectedGameweek ?: currentEvent
 
     LazyColumn(modifier = Modifier.fillMaxSize()) {
 
-        // Live banner (only when truly live + not in historical mode)
+        // Live status bar
         if (hasLiveFixtures && !isHistorical) {
-            item {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(Brush.horizontalGradient(listOf(Color(0xFFB71C1C), Color(0xFFE53935))))
-                        .padding(horizontal = 16.dp, vertical = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(8.dp)
-                            .clip(RoundedCornerShape(50))
-                            .background(Color.White)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        "LIVE  ·  Rankings updating in real-time",
-                        color = Color.White,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 12.sp,
-                        letterSpacing = 0.5.sp
-                    )
-                }
-            }
+            item { LiveStatusBar(currentEvent) }
         }
 
-        // League info
+        // League header ("LEAGUE STANDINGS" + league name)
         item {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(Color(0xFF1E1E1E))
-                    .padding(horizontal = 16.dp, vertical = 12.dp)
+                    .padding(horizontal = 20.dp)
+                    .padding(top = 20.dp, bottom = 4.dp)
             ) {
-                Text(leagueName, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
                 Text(
-                    if (isHistorical)
-                        "After GW $displayGw  ·  ${standings.size} managers"
-                    else
-                        "GW $currentEvent (Live)  ·  ${standings.size} managers",
-                    color = if (isHistorical) Color(0xFF90CAF9) else Color(0xFF9E9E9E),
-                    fontSize = 12.sp,
-                    fontWeight = if (isHistorical) FontWeight.SemiBold else FontWeight.Normal
+                    "LEAGUE STANDINGS",
+                    fontFamily = SpaceGrotesk,
+                    fontWeight = FontWeight.Black,
+                    fontSize = 32.sp,
+                    letterSpacing = (-1).sp,
+                    color = OnSurface,
+                    lineHeight = 34.sp
                 )
+                Spacer(modifier = Modifier.height(6.dp))
+                Row(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(SurfaceCont)
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        leagueName,
+                        fontFamily = SpaceGrotesk,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 16.sp,
+                        color = GoldSecondary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        "\u2022 ${standings.size} managers",
+                        fontFamily = Manrope,
+                        fontSize = 12.sp,
+                        color = OnSurfaceVariant
+                    )
+                }
             }
-            HorizontalDivider(color = Color(0xFF2D2D2D))
         }
 
         // Gameweek selector
@@ -501,11 +613,12 @@ private fun NormalRankingsView(
             }
         }
 
-        // Column headers
+        // Column header
         item {
+            Spacer(modifier = Modifier.height(8.dp))
             LeagueTableHeader(
                 showLiveColumns = !isHistorical,
-                gwLabel = if (isHistorical) "GW$displayGw" else "GW"
+                gwLabel = if (isHistorical) "GW$displayGw" else "GW PTS"
             )
         }
 
@@ -520,37 +633,75 @@ private fun NormalRankingsView(
             )
         }
 
-        item { Spacer(modifier = Modifier.height(16.dp)) }
+        item { Spacer(modifier = Modifier.height(24.dp)) }
     }
 }
 
 @Composable
-private fun LeagueTableHeader(showLiveColumns: Boolean = true, gwLabel: String = "GW") {
+private fun LeagueTableHeader(showLiveColumns: Boolean = true, gwLabel: String = "GW PTS") {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(Color(0xFF1A1A2E))
-            .padding(horizontal = 12.dp, vertical = 10.dp),
+            .padding(horizontal = 20.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text("#",       color = Color(0xFF9E9E9E), fontWeight = FontWeight.Bold, fontSize = 11.sp, modifier = Modifier.width(42.dp))
-        Text("Team",    color = Color(0xFF9E9E9E), fontWeight = FontWeight.Bold, fontSize = 11.sp, modifier = Modifier.weight(1f))
+        Text(
+            "RK",
+            color = GoldSecondary,
+            fontWeight = FontWeight.Bold,
+            fontSize = 10.sp,
+            fontFamily = SpaceGrotesk,
+            letterSpacing = 1.5.sp,
+            modifier = Modifier.width(40.dp)
+        )
+        Text(
+            "TEAM & MANAGER",
+            color = GoldSecondary,
+            fontWeight = FontWeight.Bold,
+            fontSize = 10.sp,
+            fontFamily = SpaceGrotesk,
+            letterSpacing = 1.5.sp,
+            modifier = Modifier.weight(1f)
+        )
         if (showLiveColumns) {
-            Text("▶",   color = Color(0xFF9E9E9E), fontWeight = FontWeight.Bold, fontSize = 11.sp, textAlign = TextAlign.Center, modifier = Modifier.width(34.dp))
-            Text("⏳",  color = Color(0xFF9E9E9E), fontWeight = FontWeight.Bold, fontSize = 11.sp, textAlign = TextAlign.Center, modifier = Modifier.width(34.dp))
+            Text(
+                "\u25B6",
+                color = GoldSecondary.copy(alpha = 0.6f),
+                fontWeight = FontWeight.Bold,
+                fontSize = 10.sp,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.width(28.dp)
+            )
+            Text(
+                "\u23F3",
+                color = GoldSecondary.copy(alpha = 0.6f),
+                fontWeight = FontWeight.Bold,
+                fontSize = 10.sp,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.width(28.dp)
+            )
         }
-        // GW label reflects the selected gameweek when in historical mode
         Text(
             gwLabel,
-            color = if (gwLabel == "GW") Color(0xFF9E9E9E) else Color(0xFF90CAF9),
+            color = GoldSecondary,
             fontWeight = FontWeight.Bold,
-            fontSize = if (gwLabel.length > 2) 10.sp else 11.sp,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.width(52.dp)
+            fontSize = 10.sp,
+            fontFamily = SpaceGrotesk,
+            letterSpacing = 1.sp,
+            textAlign = TextAlign.End,
+            modifier = Modifier.width(56.dp)
         )
-        Text("Total",   color = Color(0xFF9E9E9E), fontWeight = FontWeight.Bold, fontSize = 11.sp, textAlign = TextAlign.Center, modifier = Modifier.width(56.dp))
+        Text(
+            "TOTAL",
+            color = GoldSecondary,
+            fontWeight = FontWeight.Bold,
+            fontSize = 10.sp,
+            fontFamily = SpaceGrotesk,
+            letterSpacing = 1.5.sp,
+            textAlign = TextAlign.End,
+            modifier = Modifier.width(64.dp)
+        )
     }
-    HorizontalDivider(color = Color(0xFF2D2D2D), thickness = 1.dp)
 }
 
 @Composable
@@ -566,72 +717,90 @@ private fun StandingRow(
         standing.rank > standing.lastRank -> RankChange.DOWN
         else -> RankChange.NO_CHANGE
     }
-    val rowBg by animateColorAsState(
-        targetValue = if (isUserTeam) Color(0xFF0D2744) else Color(0xFF1C1C1C),
-        animationSpec = tween(300),
-        label = "rowBg"
-    )
     val hasLiveDiff = !isHistorical && liveData != null && liveData.livePoints != 0
-    // Use calculatedGwPoints (full accurate GW score) when available, otherwise fall back to eventTotal
     val gwDisplayed = if (!isHistorical && liveData != null && liveData.calculatedGwPoints > 0)
         liveData.calculatedGwPoints
     else
         standing.eventTotal
-    val activeChip   = if (!isHistorical) liveData?.activeChip else null
-    val label        = chipLabel(activeChip, liveData?.chipNumber ?: 1)
+    val activeChip = if (!isHistorical) liveData?.activeChip else null
+    val label      = chipLabel(activeChip, liveData?.chipNumber ?: 1)
 
-    Column {
+    val rowBg = if (isUserTeam) PitchGreenDark else SurfaceContLow
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 2.dp)
+    ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .clip(RoundedCornerShape(12.dp))
                 .background(rowBg)
+                .then(
+                    if (isUserTeam)
+                        Modifier.drawBehind {
+                            drawRect(
+                                color = PitchGreen,
+                                topLeft = Offset.Zero,
+                                size = Size(4.dp.toPx(), size.height)
+                            )
+                        }
+                    else Modifier
+                )
                 .clickable(onClick = onClick)
-                .padding(horizontal = 12.dp, vertical = 11.dp),
+                .padding(horizontal = 14.dp, vertical = 14.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Rank + arrow
-            Row(modifier = Modifier.width(42.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    "${standing.rank}",
-                    color = if (isUserTeam) Color(0xFF64B5F6) else Color.White,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 14.sp
-                )
-                Spacer(modifier = Modifier.width(2.dp))
-                Text(
-                    when (rankChange) { RankChange.UP -> "▲"; RankChange.DOWN -> "▼"; else -> "–" },
-                    color = when (rankChange) { RankChange.UP -> Color(0xFF00E676); RankChange.DOWN -> Color(0xFFFF1744); else -> Color(0xFF555555) },
-                    fontSize = 10.sp, fontWeight = FontWeight.Bold
-                )
-            }
+            // Rank
+            Text(
+                "%02d".format(standing.rank),
+                color = if (isUserTeam) PitchGreen else OnSurfaceVariant.copy(alpha = 0.4f),
+                fontWeight = FontWeight.Black,
+                fontSize = if (isUserTeam) 22.sp else 18.sp,
+                fontFamily = SpaceGrotesk,
+                modifier = Modifier.width(40.dp)
+            )
 
-            // Team + chip badge + sub-line
+            // Team + chip badge + manager + captain (each on own line)
             Column(modifier = Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        standing.entryName,
-                        color = if (isUserTeam) Color(0xFF90CAF9) else Color.White,
-                        fontWeight = if (isUserTeam) FontWeight.Bold else FontWeight.SemiBold,
-                        fontSize = 13.sp,
+                        standing.entryName.uppercase(),
+                        color = OnSurface,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp,
+                        fontFamily = SpaceGrotesk,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
+                        lineHeight = 18.sp,
                         modifier = Modifier.weight(1f, fill = false)
                     )
                     if (label != null) {
-                        Spacer(modifier = Modifier.width(5.dp))
-                        ChipBadge(chip = activeChip, label = label)
+                        Spacer(modifier = Modifier.width(6.dp))
+                        StitchChipBadge(chip = activeChip, label = chipShortLabel(activeChip))
                     }
                 }
-                val subText  = if (!isHistorical) liveData?.captainName?.let { "© $it" } ?: standing.playerName else standing.playerName
-                val subColor = if (!isHistorical && liveData?.captainName != null) Color(0xFF00E676) else Color(0xFF757575)
                 Text(
-                    subText,
-                    color = subColor,
+                    standing.playerName.uppercase(),
+                    color = if (isUserTeam) PitchGreen.copy(alpha = 0.8f) else OnSurfaceVariant,
                     fontSize = 11.sp,
+                    fontFamily = Manrope,
+                    fontWeight = FontWeight.Medium,
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    fontWeight = if (!isHistorical && liveData?.captainName != null) FontWeight.SemiBold else FontWeight.Normal
+                    overflow = TextOverflow.Ellipsis
                 )
+                if (!isHistorical && liveData?.captainName != null) {
+                    Text(
+                        "\u00A9 ${liveData.captainName}",
+                        color = PitchGreen,
+                        fontSize = 10.sp,
+                        fontFamily = Manrope,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
             }
 
             // In Play + To Start (live mode only)
@@ -639,60 +808,90 @@ private fun StandingRow(
                 val inPlay  = liveData?.inPlay ?: 0
                 val toStart = liveData?.toStart ?: 0
                 Text(
-                    if (inPlay > 0) "$inPlay" else "–",
-                    color = if (inPlay > 0) Color(0xFF00E676) else Color(0xFF555555),
+                    if (inPlay > 0) "$inPlay" else "\u2013",
+                    color = if (inPlay > 0) PitchGreen else OnSurfaceVariant.copy(alpha = 0.3f),
                     fontWeight = if (inPlay > 0) FontWeight.Bold else FontWeight.Normal,
-                    fontSize = 13.sp, textAlign = TextAlign.Center,
-                    modifier = Modifier.width(34.dp)
+                    fontSize = 13.sp,
+                    fontFamily = Manrope,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.width(28.dp)
                 )
                 Text(
-                    if (toStart > 0) "$toStart" else "–",
-                    color = if (toStart > 0) Color(0xFFFFAB40) else Color(0xFF555555),
+                    if (toStart > 0) "$toStart" else "\u2013",
+                    color = if (toStart > 0) GoldSecondary else OnSurfaceVariant.copy(alpha = 0.3f),
                     fontWeight = if (toStart > 0) FontWeight.Bold else FontWeight.Normal,
-                    fontSize = 13.sp, textAlign = TextAlign.Center,
-                    modifier = Modifier.width(34.dp)
+                    fontSize = 13.sp,
+                    fontFamily = Manrope,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.width(28.dp)
                 )
             }
 
             // GW pts
-            Column(modifier = Modifier.width(52.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Column(modifier = Modifier.width(56.dp), horizontalAlignment = Alignment.End) {
                 Text(
                     "$gwDisplayed",
                     color = when {
-                        hasLiveDiff  -> Color(0xFF00E676)
-                        isHistorical -> Color(0xFF90CAF9)
-                        else         -> Color.White
+                        isUserTeam   -> PitchGreen
+                        hasLiveDiff  -> PitchGreen
+                        isHistorical -> OnSurfaceVariant
+                        else         -> OnSurface
                     },
-                    fontWeight = FontWeight.Bold, fontSize = 14.sp, textAlign = TextAlign.Center
+                    fontWeight = FontWeight.Bold,
+                    fontSize = if (isUserTeam) 20.sp else 16.sp,
+                    fontFamily = SpaceGrotesk,
+                    textAlign = TextAlign.End
                 )
                 if (hasLiveDiff && liveData!!.livePoints > 0) {
-                    Text("(${standing.eventTotal})", color = Color(0xFF555555), fontSize = 9.sp, textAlign = TextAlign.Center)
+                    Text(
+                        "+${liveData.livePoints} LIVE",
+                        color = PitchGreen,
+                        fontSize = 9.sp,
+                        fontFamily = SpaceGrotesk,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.End
+                    )
                 }
             }
 
             // Total
-            Column(modifier = Modifier.width(56.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(
-                    "${standing.total}",
-                    color = when {
-                        isUserTeam   -> Color(0xFF90CAF9)
-                        hasLiveDiff  -> Color(0xFF00E676)
-                        isHistorical -> Color(0xFFE0E0E0)
-                        else         -> Color.White
-                    },
-                    fontWeight = FontWeight.Bold, fontSize = 14.sp, textAlign = TextAlign.Center
-                )
-                if (hasLiveDiff && liveData!!.livePoints > 0) {
-                    Text("+${liveData.livePoints}", color = Color(0xFF00E676), fontSize = 9.sp, textAlign = TextAlign.Center)
-                }
-            }
+            Text(
+                formatTotal(standing.total),
+                color = if (isUserTeam) OnSurface else OnSurface,
+                fontWeight = if (isUserTeam) FontWeight.Black else FontWeight.Bold,
+                fontSize = if (isUserTeam) 22.sp else 18.sp,
+                fontFamily = SpaceGrotesk,
+                textAlign = TextAlign.End,
+                modifier = Modifier.width(64.dp)
+            )
         }
-        HorizontalDivider(color = Color(0xFF282828), thickness = 0.5.dp)
     }
 }
 
-// ─── Chip History view ────────────────────────────────────────────────────────
+// ─── Stitch Chip Badge (inline in standings row) ─────────────────────────────
 
+@Composable
+private fun StitchChipBadge(chip: String?, label: String) {
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(2.dp))
+            .background(chipColor(chip))
+            .padding(horizontal = 5.dp, vertical = 2.dp)
+    ) {
+        Text(
+            label,
+            color = chipTextColor(chip),
+            fontWeight = FontWeight.Black,
+            fontSize = 9.sp,
+            fontFamily = SpaceGrotesk,
+            letterSpacing = 0.3.sp
+        )
+    }
+}
+
+// ─── Chip History View ───────────────────────────────────────────────────────
+
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ChipHistoryView(
     navController: NavController,
@@ -701,68 +900,101 @@ private fun ChipHistoryView(
     currentEvent: Int,
     userEntryId: Int?,
     leagueId: Long = 0L,
-    prefsManager: PreferencesManager? = null
+    prefsManager: PreferencesManager? = null,
+    leagueName: String = ""
 ) {
     LazyColumn(modifier = Modifier.fillMaxSize()) {
 
-        // Header banner
+        // Header section
+        item {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp)
+                    .padding(top = 20.dp, bottom = 8.dp)
+            ) {
+                Text(
+                    leagueName.uppercase(),
+                    fontFamily = SpaceGrotesk,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 11.sp,
+                    letterSpacing = 2.sp,
+                    color = PitchGreen
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    "LEAGUE CHIPS",
+                    fontFamily = SpaceGrotesk,
+                    fontWeight = FontWeight.Black,
+                    fontSize = 32.sp,
+                    letterSpacing = (-1).sp,
+                    color = OnSurface,
+                    lineHeight = 34.sp
+                )
+            }
+        }
+
+        // Season progress
         item {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(Brush.horizontalGradient(listOf(Color(0xFF1A0A3B), Color(0xFF2D1B6B))))
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically
+                    .padding(horizontal = 20.dp)
+                    .padding(bottom = 16.dp),
+                horizontalArrangement = Arrangement.End
             ) {
-                Icon(Icons.Filled.Style, null, tint = Color(0xFF00FF87), modifier = Modifier.size(20.dp))
-                Spacer(modifier = Modifier.width(10.dp))
-                Column {
-                    Text("Chip History", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                Column(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(SurfaceContLow)
+                        .border(1.dp, Color.White.copy(alpha = 0.05f), RoundedCornerShape(12.dp))
+                        .padding(horizontal = 14.dp, vertical = 8.dp)
+                ) {
                     Text(
-                        "Tap a chip to view the team for that GW  ·  GW $currentEvent",
-                        color = Color(0xFF9E9E9E),
-                        fontSize = 11.sp
+                        "SEASON PROGRESS",
+                        fontFamily = Manrope,
+                        fontSize = 9.sp,
+                        letterSpacing = 1.5.sp,
+                        color = OnSurfaceVariant
+                    )
+                    Text(
+                        "GW $currentEvent / 38",
+                        fontFamily = SpaceGrotesk,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 18.sp,
+                        color = GoldSecondary
                     )
                 }
             }
-            HorizontalDivider(color = Color(0xFF2D2D2D))
         }
 
-        // Colour legend
+        // Chip legend (2x2 grid)
         item {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(Color(0xFF181818))
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
+                    .padding(horizontal = 16.dp)
+                    .padding(bottom = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Text("Key:", color = Color(0xFF9E9E9E), fontSize = 10.sp)
-                listOf("bboost" to "BB", "wildcard" to "WC", "3xc" to "TC", "freehit" to "FH").forEach { (chip, abbrev) ->
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(4.dp))
-                            .background(chipColor(chip))
-                            .padding(horizontal = 6.dp, vertical = 3.dp)
-                    ) {
-                        Text(abbrev, color = chipTextColor(chip), fontWeight = FontWeight.ExtraBold, fontSize = 9.sp)
-                    }
-                    val name = when (chip) {
-                        "bboost" -> "Bench Boost"; "wildcard" -> "Wildcard"
-                        "3xc"    -> "Triple Cap";  "freehit"  -> "Free Hit"; else -> ""
-                    }
-                    Text(name, color = Color(0xFF9E9E9E), fontSize = 10.sp)
-                    Spacer(modifier = Modifier.width(4.dp))
-                }
+                ChipLegendCard("WC", "Wildcard", "wildcard", Modifier.weight(1f))
+                ChipLegendCard("FH", "Free Hit", "freehit", Modifier.weight(1f))
             }
-            HorizontalDivider(color = Color(0xFF2D2D2D))
+        }
+        item {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp)
+                    .padding(bottom = 20.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                ChipLegendCard("BB", "Bench Boost", "bboost", Modifier.weight(1f))
+                ChipLegendCard("TC", "Triple Cpt", "3xc", Modifier.weight(1f))
+            }
         }
 
-        // Column header
-        item { ChipHistoryHeader() }
-
-        // Rows
+        // Manager rows
         itemsIndexed(standings) { _, standing ->
             val isUserTeam = standing.entry == userEntryId
             val liveData   = managerLiveData[standing.entry]
@@ -770,6 +1002,7 @@ private fun ChipHistoryView(
                 standing   = standing,
                 isUserTeam = isUserTeam,
                 allChips   = liveData?.allChips ?: emptyList(),
+                totalPoints = standing.total,
                 onChipClick = { managerId, eventId, teamName ->
                     if (leagueId != 0L) prefsManager?.saveLeagueId(leagueId)
                     navController.navigate(
@@ -779,23 +1012,45 @@ private fun ChipHistoryView(
             )
         }
 
-        item { Spacer(modifier = Modifier.height(16.dp)) }
+        item { Spacer(modifier = Modifier.height(24.dp)) }
     }
 }
 
 @Composable
-private fun ChipHistoryHeader() {
+private fun ChipLegendCard(abbrev: String, name: String, chipType: String, modifier: Modifier = Modifier) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(Color(0xFF1A1A2E))
-            .padding(horizontal = 12.dp, vertical = 10.dp),
+        modifier = modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(SurfaceCont)
+            .border(1.dp, Color.White.copy(alpha = 0.05f), RoundedCornerShape(12.dp))
+            .padding(12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text("#",   color = Color(0xFF9E9E9E), fontWeight = FontWeight.Bold, fontSize = 11.sp, modifier = Modifier.width(34.dp))
-        Text("Team / Chips played this season", color = Color(0xFF9E9E9E), fontWeight = FontWeight.Bold, fontSize = 11.sp)
+        Box(
+            modifier = Modifier
+                .size(32.dp)
+                .clip(RoundedCornerShape(4.dp))
+                .background(chipColor(chipType)),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                abbrev,
+                color = chipTextColor(chipType),
+                fontWeight = FontWeight.Bold,
+                fontSize = 11.sp,
+                fontFamily = SpaceGrotesk
+            )
+        }
+        Spacer(modifier = Modifier.width(10.dp))
+        Text(
+            name.uppercase(),
+            fontFamily = Manrope,
+            fontSize = 10.sp,
+            letterSpacing = 1.sp,
+            fontWeight = FontWeight.Medium,
+            color = OnSurfaceVariant
+        )
     }
-    HorizontalDivider(color = Color(0xFF2D2D2D), thickness = 1.dp)
 }
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -804,112 +1059,209 @@ private fun ChipHistoryRow(
     standing: StandingEntry,
     isUserTeam: Boolean,
     allChips: List<UsedChip>,
+    totalPoints: Int,
     onChipClick: (managerId: Long, eventId: Int, teamName: String) -> Unit
 ) {
-    val rowBg by animateColorAsState(
-        targetValue = if (isUserTeam) Color(0xFF0D2744) else Color(0xFF1C1C1C),
-        animationSpec = tween(300),
-        label = "chipRowBg"
-    )
-    Column {
-        Row(
+    val rowBg = if (isUserTeam) PitchGreenDark.copy(alpha = 0.2f) else SurfaceContLow
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 3.dp)
+    ) {
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .clip(RoundedCornerShape(12.dp))
                 .background(rowBg)
-                .padding(horizontal = 12.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.Top
-        ) {
-            // Rank
-            Text(
-                "${standing.rank}",
-                color = if (isUserTeam) Color(0xFF64B5F6) else Color(0xFF9E9E9E),
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.width(34.dp).padding(top = 2.dp)
-            )
-            // Team name + manager name + chip badges
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    standing.entryName,
-                    color = if (isUserTeam) Color(0xFF90CAF9) else Color.White,
-                    fontWeight = if (isUserTeam) FontWeight.Bold else FontWeight.SemiBold,
-                    fontSize = 13.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    standing.playerName,
-                    color = Color(0xFF757575),
-                    fontSize = 11.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Spacer(modifier = Modifier.height(6.dp))
-                if (allChips.isEmpty()) {
-                    Text(
-                        "No chips played yet",
-                        color = Color(0xFF454545),
-                        fontSize = 11.sp,
-                        fontStyle = FontStyle.Italic
-                    )
-                } else {
-                    FlowRow(
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        verticalArrangement   = Arrangement.spacedBy(5.dp)
-                    ) {
-                        allChips.forEach { chip ->
-                            ChipHistoryBadge(
-                                chip     = chip,
-                                onClick  = {
-                                    onChipClick(
-                                        standing.entry.toLong(),
-                                        chip.event,
-                                        standing.entryName.ifBlank { standing.playerName }
-                                    )
-                                }
+                .then(
+                    if (isUserTeam)
+                        Modifier.drawBehind {
+                            drawRect(
+                                color = PitchGreen,
+                                topLeft = Offset.Zero,
+                                size = Size(4.dp.toPx(), size.height)
                             )
                         }
+                    else Modifier
+                )
+                .border(
+                    width = 1.dp,
+                    color = if (isUserTeam) Color.Transparent else Color.White.copy(alpha = 0.05f),
+                    shape = RoundedCornerShape(12.dp)
+                )
+                .padding(16.dp)
+        ) {
+            // Top: Rank + Team + Points
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    "%02d".format(standing.rank),
+                    color = if (isUserTeam) PitchGreen.copy(alpha = 0.5f) else OnSurfaceVariant.copy(alpha = 0.3f),
+                    fontWeight = FontWeight.Black,
+                    fontSize = 22.sp,
+                    fontFamily = SpaceGrotesk,
+                    modifier = Modifier.width(36.dp)
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        standing.entryName.uppercase(),
+                        color = OnSurface,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 15.sp,
+                        fontFamily = SpaceGrotesk,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        lineHeight = 18.sp
+                    )
+                    Row {
+                        Text(
+                            standing.playerName,
+                            color = OnSurfaceVariant,
+                            fontSize = 11.sp,
+                            fontFamily = Manrope,
+                            fontWeight = FontWeight.Medium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            " | ",
+                            color = OnSurfaceVariant.copy(alpha = 0.4f),
+                            fontSize = 11.sp,
+                            fontFamily = Manrope
+                        )
+                        Text(
+                            "${formatTotal(totalPoints)} pts",
+                            color = if (isUserTeam) PitchGreen else OnSurface,
+                            fontSize = 11.sp,
+                            fontFamily = Manrope,
+                            fontWeight = FontWeight.Medium
+                        )
                     }
                 }
             }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Build chip grid: standard slots + any extra chips the manager used
+            val standardSlots = listOf(
+                "wildcard" to 1,
+                "freehit" to 1,
+                "bboost" to 1,
+                "3xc" to 1,
+                "wildcard" to 2,
+                "freehit" to 2
+            )
+            val standardSet = standardSlots.toSet()
+            val extraChips = allChips
+                .filter { (it.name to it.number) !in standardSet }
+                .map { it.name to it.number }
+            val allSlots = standardSlots + extraChips
+
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                allSlots.forEach { (chipType, chipNum) ->
+                    val usedChip = allChips.find { it.name == chipType && it.number == chipNum }
+                    ChipGridItem(
+                        chipType = chipType,
+                        chipNum  = chipNum,
+                        usedChip = usedChip,
+                        onClick  = if (usedChip != null) {
+                            {
+                                onChipClick(
+                                    standing.entry.toLong(),
+                                    usedChip.event,
+                                    standing.entryName.ifBlank { standing.playerName }
+                                )
+                            }
+                        } else null
+                    )
+                }
+            }
         }
-        HorizontalDivider(color = Color(0xFF282828), thickness = 0.5.dp)
     }
 }
 
-/** Badge: coloured label + GW number. Tapping navigates to that team/GW. */
 @Composable
-private fun ChipHistoryBadge(chip: UsedChip, onClick: () -> Unit) {
-    val label     = chipLabel(chip.name, chip.number) ?: chip.name.uppercase()
-    val color     = chipColor(chip.name)
-    val textColor = chipTextColor(chip.name)
+private fun ChipGridItem(
+    chipType: String,
+    chipNum: Int,
+    usedChip: UsedChip?,
+    onClick: (() -> Unit)?
+) {
+    val isUsed = usedChip != null
+    val lbl = chipLabel(chipType, chipNum) ?: chipType.uppercase()
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.clickable(onClick = onClick)
+        modifier = if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier
     ) {
-        Box(
-            modifier = Modifier
-                .clip(RoundedCornerShape(5.dp))
-                .background(color)
-                .padding(horizontal = 7.dp, vertical = 4.dp)
-        ) {
-            Text(label, color = textColor, fontWeight = FontWeight.ExtraBold, fontSize = 10.sp, letterSpacing = 0.3.sp)
+        if (isUsed) {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(chipColor(chipType))
+                    .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(4.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    lbl,
+                    color = chipTextColor(chipType),
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 11.sp,
+                    fontFamily = SpaceGrotesk
+                )
+            }
+            Text(
+                "GW ${usedChip!!.event}",
+                color = OnSurfaceVariant,
+                fontSize = 9.sp,
+                fontFamily = Manrope,
+                fontWeight = FontWeight.Medium,
+                letterSpacing = 0.5.sp,
+                modifier = Modifier.padding(top = 2.dp)
+            )
+        } else {
+            val dashColor = OutlineVar
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .alpha(0.2f)
+                    .drawBehind {
+                        drawRoundRect(
+                            color = dashColor,
+                            style = Stroke(
+                                width = 2.dp.toPx(),
+                                pathEffect = PathEffect.dashPathEffect(
+                                    floatArrayOf(6.dp.toPx(), 4.dp.toPx()), 0f
+                                )
+                            ),
+                            cornerRadius = androidx.compose.ui.geometry.CornerRadius(4.dp.toPx())
+                        )
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    lbl,
+                    color = OnSurfaceVariant,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 9.sp,
+                    fontFamily = SpaceGrotesk
+                )
+            }
+            Text(
+                "---",
+                color = OnSurfaceVariant.copy(alpha = 0.2f),
+                fontSize = 9.sp,
+                fontFamily = Manrope,
+                modifier = Modifier.padding(top = 2.dp)
+            )
         }
-        Text("GW${chip.event}", color = Color(0xFF666666), fontSize = 8.sp, textAlign = TextAlign.Center)
-    }
-}
-
-// ─── Shared chip badge (in normal standings row) ─────────────────────────────
-
-@Composable
-private fun ChipBadge(chip: String?, label: String) {
-    Box(
-        modifier = Modifier
-            .clip(RoundedCornerShape(4.dp))
-            .background(chipColor(chip))
-            .padding(horizontal = 5.dp, vertical = 2.dp)
-    ) {
-        Text(label, color = chipTextColor(chip), fontWeight = FontWeight.ExtraBold, fontSize = 9.sp, letterSpacing = 0.3.sp)
     }
 }
