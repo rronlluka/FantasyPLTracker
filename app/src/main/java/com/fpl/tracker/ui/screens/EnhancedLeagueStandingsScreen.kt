@@ -574,7 +574,11 @@ private fun StandingRow(
         label = "rowBg"
     )
     val hasLiveDiff = !isHistorical && liveData != null && liveData.livePoints != 0
-    val gwDisplayed  = standing.eventTotal + (if (!isHistorical) liveData?.livePoints ?: 0 else 0)
+    // Use calculatedGwPoints (full accurate GW score) when available, otherwise fall back to eventTotal
+    val gwDisplayed = if (!isHistorical && liveData != null && liveData.calculatedGwPoints > 0)
+        liveData.calculatedGwPoints
+    else
+        standing.eventTotal
     val activeChip   = if (!isHistorical) liveData?.activeChip else null
     val label        = chipLabel(activeChip, liveData?.chipNumber ?: 1)
 

@@ -28,6 +28,7 @@ data class ManagerLiveData(
     val toStart: Int,
     val livePoints: Int = 0,
     val totalLivePoints: Int = 0,
+    val calculatedGwPoints: Int = 0,  // Full GW total including finished + live games
     val captainName: String? = null,
     val viceCaptainName: String? = null,
     val activeChip: String? = null,
@@ -463,31 +464,37 @@ class LeagueStandingsViewModel : ViewModel() {
                                                     playerPoints = player.eventPoints
                                                 }
                                             } else {
-                                                // Game not started or finished, use base points
-                                                playerPoints = player.eventPoints
-                                                Log.d("LeagueStandings", "${standing.entryName} - ${player.webName}: ${playerPoints}pts × ${multiplier} = ${playerPoints * multiplier} (base)")
+                                                // Game finished or not started — prefer live API points
+                                                // as they are more up-to-date than bootstrap eventPoints
+                                                val liveStats = liveGameweek?.elements?.find { it.id == playerId }
+                                                val fixtureStarted = fixture?.started == true
+                                                playerPoints = if (fixtureStarted && liveStats != null) {
+                                                    liveStats.stats.totalPoints
+                                                } else {
+                                                    player.eventPoints
+                                                }
+                                                Log.d("LeagueStandings", "${standing.entryName} - ${player.webName}: ${playerPoints}pts × ${multiplier} = ${playerPoints * multiplier} (finished/base)")
                                             }
 
                                             calculatedGwPoints += playerPoints * multiplier
                                         }
                                     }
 
-                                    // livePointsDiff is ONLY the points from truly in-progress games.
-                                    // This avoids inflating the diff when standing.eventTotal is stale.
-                                    val finalGwPoints = maxOf(calculatedGwPoints, standing.eventTotal)
-                                    val livePointsDiff = liveOnlyPoints
+                                    // calculatedGwPoints = full GW score (finished + live games)
+                                    // liveOnlyPoints = only truly in-progress game points (for the +X badge)
+                                    // totalLivePoints = overall total using calculated GW score instead of stale API total
+                                    val gwDiff = calculatedGwPoints - standing.eventTotal
+                                    val totalLivePoints = standing.total + gwDiff
 
-                                    Log.d("LeagueStandings", "Manager ${standing.entryName}: Calculated=$calculatedGwPoints, API=${standing.eventTotal}, Using=$finalGwPoints (diff=$livePointsDiff, chip=$activeChip)")
+                                    Log.d("LeagueStandings", "Manager ${standing.entryName}: Calculated=$calculatedGwPoints, API=${standing.eventTotal}, GWDiff=$gwDiff, Total=$totalLivePoints, LiveOnly=$liveOnlyPoints, chip=$activeChip")
 
-                                    val totalLivePoints = standing.total + livePointsDiff
-
-                                    Log.d("LeagueStandings", "Manager ${standing.entryName}: InPlay=$inPlay, ToStart=$toStart, GWPts=$finalGwPoints, Total=$totalLivePoints, Chip=$activeChip#$chipNumber")
                                     ManagerLiveData(
                                         managerId = standing.entry,
                                         inPlay = inPlay,
                                         toStart = toStart,
-                                        livePoints = livePointsDiff,
+                                        livePoints = liveOnlyPoints,
                                         totalLivePoints = totalLivePoints,
+                                        calculatedGwPoints = calculatedGwPoints,
                                         captainName = captainPlayer?.webName,
                                         viceCaptainName = viceCaptainPlayer?.webName,
                                         activeChip = activeChip,
@@ -515,10 +522,14 @@ class LeagueStandingsViewModel : ViewModel() {
                 // Calculate live rankings based on total live points
                 val liveRankings = leagueStandings.standings.results.map { standing ->
                     val liveData = managerLiveDataMap[standing.entry]
-                    val totalWithLive = standing.total + (liveData?.livePoints ?: 0)
-                    
-                    // Create updated standing entry with live total
-                    standing.copy(total = totalWithLive)
+                    // Use totalLivePoints which = standing.total + (calculatedGwPoints - eventTotal)
+                    val totalWithLive = liveData?.totalLivePoints ?: standing.total
+
+                    // Create updated standing entry with live total and correct GW score
+                    standing.copy(
+                        total = totalWithLive,
+                        eventTotal = liveData?.calculatedGwPoints ?: standing.eventTotal
+                    )
                 }.sortedByDescending { it.total }
                     .mapIndexed { index, standing ->
                         standing.copy(rank = index + 1)
