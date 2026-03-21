@@ -1,13 +1,11 @@
 package com.fpl.tracker.ui.screens
 
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -28,9 +26,8 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.PathEffect
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -1146,41 +1143,32 @@ private fun ChipHistoryRow(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Build chip grid: standard slots + any extra chips the manager used
-            val standardSlots = listOf(
-                "wildcard" to 1,
-                "freehit" to 1,
-                "bboost" to 1,
-                "3xc" to 1,
-                "wildcard" to 2,
-                "freehit" to 2
-            )
-            val standardSet = standardSlots.toSet()
-            val extraChips = allChips
-                .filter { (it.name to it.number) !in standardSet }
-                .map { it.name to it.number }
-            val allSlots = standardSlots + extraChips
-
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                allSlots.forEach { (chipType, chipNum) ->
-                    val usedChip = allChips.find { it.name == chipType && it.number == chipNum }
-                    ChipGridItem(
-                        chipType = chipType,
-                        chipNum  = chipNum,
-                        usedChip = usedChip,
-                        onClick  = if (usedChip != null) {
-                            {
+            // Only chips actually played (chronological by GW)
+            if (allChips.isEmpty()) {
+                Text(
+                    "No chips played yet",
+                    color = OnSurfaceVariant.copy(alpha = 0.45f),
+                    fontSize = 12.sp,
+                    fontFamily = Manrope,
+                    fontStyle = FontStyle.Italic
+                )
+            } else {
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    allChips.sortedBy { it.event }.forEach { chip ->
+                        ChipGridItemUsed(
+                            chip = chip,
+                            onClick = {
                                 onChipClick(
                                     standing.entry.toLong(),
-                                    usedChip.event,
+                                    chip.event,
                                     standing.entryName.ifBlank { standing.playerName }
                                 )
                             }
-                        } else null
-                    )
+                        )
+                    }
                 }
             }
         }
@@ -1188,80 +1176,40 @@ private fun ChipHistoryRow(
 }
 
 @Composable
-private fun ChipGridItem(
-    chipType: String,
-    chipNum: Int,
-    usedChip: UsedChip?,
-    onClick: (() -> Unit)?
+private fun ChipGridItemUsed(
+    chip: UsedChip,
+    onClick: () -> Unit
 ) {
-    val isUsed = usedChip != null
-    val lbl = chipLabel(chipType, chipNum) ?: chipType.uppercase()
+    val lbl = chipLabel(chip.name, chip.number) ?: chip.name.uppercase()
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier
+        modifier = Modifier.clickable(onClick = onClick)
     ) {
-        if (isUsed) {
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(RoundedCornerShape(4.dp))
-                    .background(chipColor(chipType))
-                    .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(4.dp)),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    lbl,
-                    color = chipTextColor(chipType),
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 11.sp,
-                    fontFamily = SpaceGrotesk
-                )
-            }
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .clip(RoundedCornerShape(4.dp))
+                .background(chipColor(chip.name))
+                .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(4.dp)),
+            contentAlignment = Alignment.Center
+        ) {
             Text(
-                "GW ${usedChip!!.event}",
-                color = OnSurfaceVariant,
-                fontSize = 9.sp,
-                fontFamily = Manrope,
-                fontWeight = FontWeight.Medium,
-                letterSpacing = 0.5.sp,
-                modifier = Modifier.padding(top = 2.dp)
-            )
-        } else {
-            val dashColor = OutlineVar
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .alpha(0.2f)
-                    .drawBehind {
-                        drawRoundRect(
-                            color = dashColor,
-                            style = Stroke(
-                                width = 2.dp.toPx(),
-                                pathEffect = PathEffect.dashPathEffect(
-                                    floatArrayOf(6.dp.toPx(), 4.dp.toPx()), 0f
-                                )
-                            ),
-                            cornerRadius = androidx.compose.ui.geometry.CornerRadius(4.dp.toPx())
-                        )
-                    },
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    lbl,
-                    color = OnSurfaceVariant,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 9.sp,
-                    fontFamily = SpaceGrotesk
-                )
-            }
-            Text(
-                "---",
-                color = OnSurfaceVariant.copy(alpha = 0.2f),
-                fontSize = 9.sp,
-                fontFamily = Manrope,
-                modifier = Modifier.padding(top = 2.dp)
+                lbl,
+                color = chipTextColor(chip.name),
+                fontWeight = FontWeight.Bold,
+                fontSize = 11.sp,
+                fontFamily = SpaceGrotesk
             )
         }
+        Text(
+            "GW ${chip.event}",
+            color = OnSurfaceVariant,
+            fontSize = 9.sp,
+            fontFamily = Manrope,
+            fontWeight = FontWeight.Medium,
+            letterSpacing = 0.5.sp,
+            modifier = Modifier.padding(top = 2.dp)
+        )
     }
 }
