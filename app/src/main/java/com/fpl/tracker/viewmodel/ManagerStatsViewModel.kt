@@ -17,6 +17,7 @@ data class ManagerStatsUiState(
     val managerData: ManagerData? = null,
     val managerHistory: ManagerHistory? = null,
     val bootstrapData: BootstrapData? = null,
+    val transfers: List<ManagerTransfer> = emptyList(),
     val livePoints: Int = 0,  // Points from players currently playing or just finished
     val totalLivePoints: Int = 0,  // GW points + live points
     val inPlay: Int = 0,
@@ -44,6 +45,9 @@ class ManagerStatsViewModel : ViewModel() {
             
             // Load manager history
             val historyResult = repository.getManagerHistory(managerId)
+            
+            // Load transfers
+            val transfersResult = repository.getManagerTransfers(managerId)
             
             if (managerResult.isFailure || historyResult.isFailure) {
                 _uiState.value = _uiState.value.copy(
@@ -196,6 +200,7 @@ class ManagerStatsViewModel : ViewModel() {
                     managerData = managerData,
                     managerHistory = historyResult.getOrNull(),
                     bootstrapData = bootstrap,
+                    transfers = transfersResult.getOrNull() ?: emptyList(),
                     livePoints = livePoints,
                     totalLivePoints = totalLivePoints,
                     inPlay = inPlay,

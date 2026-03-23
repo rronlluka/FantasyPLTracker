@@ -13,6 +13,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -36,24 +38,8 @@ import com.fpl.tracker.data.models.FixtureStatValue
 import com.fpl.tracker.data.models.LiveElement
 import com.fpl.tracker.data.models.Player
 import com.fpl.tracker.data.models.Team
+ import com.fpl.tracker.ui.theme.*
 import com.fpl.tracker.viewmodel.MatchesViewModel
-
-// ─── Stitch design-system tokens ────────────────────────────────────────────
-private val StitchBackground        = Color(0xFF131313)
-private val StitchSurface           = Color(0xFF1C1B1B)
-private val StitchSurfaceContainer  = Color(0xFF20201F)
-private val StitchSurfaceHigh       = Color(0xFF2A2A2A)
-private val StitchSurfaceHighest    = Color(0xFF353535)
-private val StitchPrimary           = Color(0xFFA1D494)
-private val StitchPrimaryContainer  = Color(0xFF2D5A27)
-private val StitchOnPrimary         = Color(0xFF0A3909)
-private val StitchSecondary         = Color(0xFFFFE083)
-private val StitchTertiary          = Color(0xFFFFB3AD)
-private val StitchTertiaryContainer = Color(0xFFA40217)
-private val StitchOnSurface         = Color(0xFFE5E2E1)
-private val StitchOnSurfaceVariant  = Color(0xFFC2C9BB)
-private val StitchOutline           = Color(0xFF8C9387)
-private val StitchOutlineVariant    = Color(0xFF42493E)
 
 // Legacy aliases still used by FixtureCard live-dot
 private val FplGreen   = StitchPrimary
@@ -124,10 +110,11 @@ fun MatchesScreen(
                         )
                         Spacer(Modifier.width(6.dp))
                         Icon(
-                            Icons.Default.Refresh,
-                            contentDescription = null,
-                            tint = StitchSecondary,
-                            modifier = Modifier.size(22.dp)
+                            if (dropdownExpanded.value) Icons.Default.KeyboardArrowUp
+                            else Icons.Default.KeyboardArrowDown,
+                            contentDescription = "Select gameweek",
+                            tint = StitchOnSurfaceVariant,
+                            modifier = Modifier.size(26.dp)
                         )
                     }
                     ExposedDropdownMenu(
@@ -298,19 +285,22 @@ fun FixtureCard(
     // Goal scorers for footer
     val goalsStat = fixture.stats?.find { it.identifier == "goals_scored" }
     val ownGoalsStat = fixture.stats?.find { it.identifier == "own_goals" }
+    val penaltiesScoredStat = fixture.stats?.find { it.identifier == "penalties_scored" }
     val homeGoalEntries = if (isLive || isFinished) buildGoalEntries(
         scoringEntries = goalsStat?.h.orEmpty(),
         ownGoalEntries = ownGoalsStat?.a.orEmpty(),
         scoringTeamShort = homeTeam?.shortName ?: "H",
         ownGoalTeamShort = awayTeam?.shortName ?: "A",
-        players = players
+        players = players,
+        penaltyEntries = penaltiesScoredStat?.h.orEmpty()
     ) else emptyList()
     val awayGoalEntries = if (isLive || isFinished) buildGoalEntries(
         scoringEntries = goalsStat?.a.orEmpty(),
         ownGoalEntries = ownGoalsStat?.h.orEmpty(),
         scoringTeamShort = awayTeam?.shortName ?: "A",
         ownGoalTeamShort = homeTeam?.shortName ?: "H",
-        players = players
+        players = players,
+        penaltyEntries = penaltiesScoredStat?.a.orEmpty()
     ) else emptyList()
     val hasGoals = homeGoalEntries.isNotEmpty() || awayGoalEntries.isNotEmpty()
 
@@ -624,6 +614,7 @@ fun FixtureCard(
                                             append(entry.playerName)
                                             if (entry.count > 1) append(" ×${entry.count}")
                                             if (entry.isOwnGoal) append(" (og)")
+                                            if (entry.isPenalty) append(" (P)")
                                         },
                                         fontSize = 11.sp,
                                         color = StitchOnSurfaceVariant,
@@ -645,6 +636,7 @@ fun FixtureCard(
                                             append(entry.playerName)
                                             if (entry.count > 1) append(" ×${entry.count}")
                                             if (entry.isOwnGoal) append(" (og)")
+                                            if (entry.isPenalty) append(" (P)")
                                         },
                                         fontSize = 11.sp,
                                         color = StitchOnSurfaceVariant,
@@ -745,7 +737,7 @@ fun FixtureDetailDialog(
                     }
                     // Title
                     Text(
-                        text = "PITCH-SIDE GALLERY",
+                        text = "",
                         modifier = Modifier.align(Alignment.Center),
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Bold,
@@ -1007,19 +999,22 @@ fun FixtureDetailDialog(
                     // Goals
                     val goalsStat = allStats.find { it.identifier == "goals_scored" }
                     val ownGoalsStat = allStats.find { it.identifier == "own_goals" }
+                    val penaltiesScoredStat = allStats.find { it.identifier == "penalties_scored" }
                     val homeGoalEntries = buildGoalEntries(
                         scoringEntries = goalsStat?.h.orEmpty(),
                         ownGoalEntries = ownGoalsStat?.a.orEmpty(),
                         scoringTeamShort = homeTeam?.shortName ?: "H",
                         ownGoalTeamShort = awayTeam?.shortName ?: "A",
-                        players = players
+                        players = players,
+                        penaltyEntries = penaltiesScoredStat?.h.orEmpty()
                     )
                     val awayGoalEntries = buildGoalEntries(
                         scoringEntries = goalsStat?.a.orEmpty(),
                         ownGoalEntries = ownGoalsStat?.h.orEmpty(),
                         scoringTeamShort = awayTeam?.shortName ?: "A",
                         ownGoalTeamShort = homeTeam?.shortName ?: "H",
-                        players = players
+                        players = players,
+                        penaltyEntries = penaltiesScoredStat?.a.orEmpty()
                     )
                     if (homeGoalEntries.isNotEmpty() || awayGoalEntries.isNotEmpty()) {
                         MatchReportBentoCard(
@@ -1074,7 +1069,91 @@ fun FixtureDetailDialog(
                         }
                     }
 
-                    // Yellow cards
+                    // Penalties
+                    val penMissedStat = allStats.find { it.identifier == "penalties_missed" }
+                    val penSavedStat  = allStats.find { it.identifier == "penalties_saved" }
+                    val hasPenalties  = (penMissedStat != null && (penMissedStat.h.isNotEmpty() || penMissedStat.a.isNotEmpty()))
+                                     || (penSavedStat  != null && (penSavedStat.h.isNotEmpty()  || penSavedStat.a.isNotEmpty()))
+                    if (hasPenalties) {
+                        // Build saver lookup: element → saver name (saved a penalty against the OTHER team)
+                        val homeSavers = penSavedStat?.h.orEmpty()
+                            .associate { it.element to (players.find { p -> p.id == it.element }?.webName ?: "P${it.element}") }
+                        val awaySavers = penSavedStat?.a.orEmpty()
+                            .associate { it.element to (players.find { p -> p.id == it.element }?.webName ?: "P${it.element}") }
+
+                        MatchReportBentoCard(
+                            icon = "🎯",
+                            iconColor = StitchTertiary,
+                            title = "Penalties"
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(16.dp)
+                            ) {
+                                // Home missed penalties (home player missed, away keeper may have saved)
+                                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    val homeMissed = penMissedStat?.h.orEmpty()
+                                    if (homeMissed.isEmpty() && awaySavers.isEmpty()) {
+                                        Text("—", fontSize = 12.sp, color = StitchOutlineVariant)
+                                    } else {
+                                        homeMissed.forEach { sv ->
+                                            val name = players.find { it.id == sv.element }?.webName ?: "P${sv.element}"
+                                            // Who saved it? Check if any away saver element exists for this fixture
+                                            val saverName = awaySavers.values.firstOrNull()
+                                            Column {
+                                                Text(
+                                                    text = "❌ $name",
+                                                    fontSize = 12.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = StitchTertiary
+                                                )
+                                                if (saverName != null) {
+                                                    Text(
+                                                        text = "🧤 Saved by $saverName",
+                                                        fontSize = 10.sp,
+                                                        color = StitchSecondary,
+                                                        fontWeight = FontWeight.SemiBold
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                                // Away missed penalties (away player missed, home keeper may have saved)
+                                Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    val awayMissed = penMissedStat?.a.orEmpty()
+                                    if (awayMissed.isEmpty() && homeSavers.isEmpty()) {
+                                        Text("—", fontSize = 12.sp, color = StitchOutlineVariant, textAlign = TextAlign.End)
+                                    } else {
+                                        awayMissed.forEach { sv ->
+                                            val name = players.find { it.id == sv.element }?.webName ?: "P${sv.element}"
+                                            val saverName = homeSavers.values.firstOrNull()
+                                            Column(horizontalAlignment = Alignment.End) {
+                                                Text(
+                                                    text = "$name ❌",
+                                                    fontSize = 12.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = StitchTertiary,
+                                                    textAlign = TextAlign.End
+                                                )
+                                                if (saverName != null) {
+                                                    Text(
+                                                        text = "Saved by $saverName 🧤",
+                                                        fontSize = 10.sp,
+                                                        color = StitchSecondary,
+                                                        fontWeight = FontWeight.SemiBold,
+                                                        textAlign = TextAlign.End
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+
                     val yellowStat = allStats.find { it.identifier == "yellow_cards" }
                     if (yellowStat != null && (yellowStat.h.isNotEmpty() || yellowStat.a.isNotEmpty())) {
                         MatchReportBentoCard(
@@ -1328,7 +1407,8 @@ private data class GoalEventEntry(
     val playerName: String,
     val teamShort: String,
     val count: Int,
-    val isOwnGoal: Boolean
+    val isOwnGoal: Boolean,
+    val isPenalty: Boolean = false
 )
 
 private data class DefensiveContributionEntry(
@@ -1346,14 +1426,17 @@ private fun buildGoalEntries(
     ownGoalEntries: List<FixtureStatValue>,
     scoringTeamShort: String,
     ownGoalTeamShort: String,
-    players: List<Player>
+    players: List<Player>,
+    penaltyEntries: List<FixtureStatValue> = emptyList()
 ): List<GoalEventEntry> {
+    val penaltyPlayerIds = penaltyEntries.map { it.element }.toSet()
     val scored = scoringEntries.map { entry ->
         GoalEventEntry(
             playerName = players.find { it.id == entry.element }?.webName ?: "P${entry.element}",
             teamShort = scoringTeamShort,
             count = entry.value,
-            isOwnGoal = false
+            isOwnGoal = false,
+            isPenalty = entry.element in penaltyPlayerIds
         )
     }
     val ownGoals = ownGoalEntries.map { entry ->
@@ -1361,7 +1444,8 @@ private fun buildGoalEntries(
             playerName = players.find { it.id == entry.element }?.webName ?: "P${entry.element}",
             teamShort = ownGoalTeamShort,
             count = entry.value,
-            isOwnGoal = true
+            isOwnGoal = true,
+            isPenalty = false
         )
     }
     return scored + ownGoals
@@ -1478,6 +1562,7 @@ private fun GoalEventColumn(
                         buildString {
                             append(entry.teamShort.ifBlank { fallbackLabel })
                             if (entry.isOwnGoal) append(" • Own Goal")
+                            if (entry.isPenalty) append(" • Pen")
                             if (entry.count > 1) append(" ×${entry.count}")
                         },
                         fontSize = 10.sp,

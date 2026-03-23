@@ -23,6 +23,10 @@ sealed class Screen(val route: String) {
         fun createRoute(managerId: Long, eventId: Int, teamName: String) =
             "manager_formation/$managerId/$eventId/${Uri.encode(teamName)}"
     }
+    object TransferHistory : Screen("transfer_history/{managerId}/{teamName}") {
+        fun createRoute(managerId: Long, teamName: String) =
+            "transfer_history/$managerId/${Uri.encode(teamName)}"
+    }
 }
 
 @Composable
@@ -78,6 +82,22 @@ fun NavGraph(
             val rawTeamName = backStackEntry.arguments?.getString("teamName") ?: "Team Formation"
             val decodedTeamName = Uri.decode(rawTeamName).takeIf { it.isNotBlank() } ?: "Team Formation"
             ManagerFormationScreen(navController, managerId, eventId, decodedTeamName)
+        }
+
+        composable(
+            route = Screen.TransferHistory.route,
+            arguments = listOf(
+                navArgument("managerId") { type = NavType.LongType },
+                navArgument("teamName") {
+                    type = NavType.StringType
+                    defaultValue = "Transfer History"
+                }
+            )
+        ) { backStackEntry ->
+            val managerId = backStackEntry.arguments?.getLong("managerId") ?: 0L
+            val rawTeamName = backStackEntry.arguments?.getString("teamName") ?: "Transfer History"
+            val decodedTeamName = Uri.decode(rawTeamName).takeIf { it.isNotBlank() } ?: "Transfer History"
+            TransferHistoryScreen(navController, managerId, decodedTeamName)
         }
     }
 }
