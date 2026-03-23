@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300..700&amp;family=Manrope:wght@200..800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "surface-container-highest": "#353535",
+              "surface": "#131313",
+              "on-secondary": "#3c2f00",
+              "on-primary-fixed-variant": "#23501e",
+              "inverse-primary": "#3b6934",
+              "surface-container": "#20201f",
+              "on-error": "#690005",
+              "on-surface-variant": "#c2c9bb",
+              "on-tertiary-container": "#ffaea7",
+              "surface-container-low": "#1c1b1b",
+              "primary-fixed-dim": "#a1d494",
+              "inverse-on-surface": "#313030",
+              "on-primary-container": "#9dd090",
+              "primary-fixed": "#bcf0ae",
+              "on-secondary-container": "#645000",
+              "on-tertiary": "#68000a",
+              "error-container": "#93000a",
+              "outline-variant": "#42493e",
+              "on-primary": "#0a3909",
+              "tertiary-fixed": "#ffdad7",
+              "background": "#131313",
+              "surface-container-high": "#2a2a2a",
+              "on-secondary-fixed-variant": "#574500",
+              "on-error-container": "#ffdad6",
+              "surface-container-lowest": "#0e0e0e",
+              "on-background": "#e5e2e1",
+              "secondary": "#ffe083",
+              "tertiary-container": "#a40217",
+              "inverse-surface": "#e5e2e1",
+              "tertiary": "#ffb3ad",
+              "surface-bright": "#393939",
+              "outline": "#8c9387",
+              "error": "#ffb4ab",
+              "secondary-fixed": "#ffe083",
+              "surface-tint": "#a1d494",
+              "on-tertiary-fixed": "#410004",
+              "primary-container": "#2d5a27",
+              "on-surface": "#e5e2e1",
+              "on-tertiary-fixed-variant": "#930013",
+              "on-primary-fixed": "#002201",
+              "secondary-container": "#eec200",
+              "primary": "#a1d494",
+              "tertiary-fixed-dim": "#ffb3ad",
+              "secondary-fixed-dim": "#eec200",
+              "on-secondary-fixed": "#231b00",
+              "surface-dim": "#131313",
+              "surface-variant": "#353535"
+            },
+            fontFamily: {
+              "headline": ["Space Grotesk"],
+              "body": ["Manrope"],
+              "label": ["Manrope"]
+            },
+            borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+          },
+        },
+      }
+    </script>
+<style>
+      .pitch-gradient {
+        background: radial-gradient(circle at center, #2d5a27 0%, #131313 100%);
+      }
+      .pitch-lines {
+        background-image: 
+          linear-gradient(to bottom, rgba(161, 212, 148, 0.1) 1px, transparent 1px),
+          linear-gradient(to right, rgba(161, 212, 148, 0.1) 1px, transparent 1px);
+        background-size: 40px 40px;
+      }
+      .material-symbols-outlined {
+        font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-background font-body selection:bg-primary selection:text-on-primary">
+<!-- Top Navigation Anchor (from JSON) -->
+<header class="bg-[#131313] dark:bg-[#131313] shadow-[0_24px_24px_rgba(0,0,0,0.06)] sticky top-0 z-50">
+<div class="flex items-center justify-between w-full px-6 py-4">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-full bg-surface-container overflow-hidden border border-outline-variant/20">
+<img alt="Manager Profile Avatar" class="w-full h-full object-cover" data-alt="Stylized portrait of a sports manager avatar" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC6ptimOrzjWzFTp2mMiFI7IXVEuPPYCiiy33LQuJLflpuXIPg835PQnjRCy19zMiqImadp2zPxVKNOT5tL66jEVuYW7walufZqQ6I4sifkuoL_ziF0A5g_nbukNBoc4HE_QzakzuCtKpNX77J4wXVsr1Xit1XMpixmkMYeijGs7lXwkJ-qtQtsoNOmIQ3S4C6gAsfOQin6HmA79f2yKka21VMgjtFmoNNMqB3SNxT08E_haNJfZDhYx4Irn65R3CvSje6JbJeSCJFn"/>
+</div>
+<h1 class="text-2xl font-headline font-bold tracking-tighter text-[#a1d494] uppercase">The Pitch-Side Gallery</h1>
+</div>
+<button class="active:scale-95 transition-transform text-[#a1d494]">
+<span class="material-symbols-outlined text-2xl">settings</span>
+</button>
+</div>
+</header>
+<main class="pb-32">
+<!-- Dashboard Header: Live Points -->
+<section class="px-6 pt-8 pb-4">
+<div class="flex justify-between items-end mb-6">
+<div>
+<span class="font-headline font-bold text-primary uppercase tracking-widest text-sm">Gameweek 31</span>
+<h2 class="text-5xl font-headline font-extrabold tracking-tighter text-on-surface">Bando</h2>
+</div>
+<div class="text-right">
+<div class="bg-tertiary-container px-3 py-1 rounded-full inline-flex items-center gap-2 mb-2 animate-pulse">
+<span class="w-2 h-2 rounded-full bg-white"></span>
+<span class="text-[10px] font-bold uppercase tracking-tighter text-white">Live</span>
+</div>
+</div>
+</div>
+<div class="grid grid-cols-2 gap-4">
+<div class="bg-surface-container-low p-6 rounded-xl border border-outline-variant/10 relative overflow-hidden group">
+<div class="absolute -right-4 -top-4 opacity-10 group-hover:scale-110 transition-transform duration-700">
+<span class="material-symbols-outlined text-8xl" style="font-variation-settings: 'wght' 700;">sports_soccer</span>
+</div>
+<p class="text-label-sm uppercase font-bold text-outline tracking-[0.2em] mb-1">GW Points</p>
+<p class="text-6xl font-headline font-black text-primary">18</p>
+</div>
+<div class="bg-surface-container-low p-6 rounded-xl border border-outline-variant/10 relative overflow-hidden group">
+<div class="absolute -right-4 -top-4 opacity-10 group-hover:scale-110 transition-transform duration-700">
+<span class="material-symbols-outlined text-8xl" style="font-variation-settings: 'wght' 700;">leaderboard</span>
+</div>
+<p class="text-label-sm uppercase font-bold text-outline tracking-[0.2em] mb-1">Total Score</p>
+<p class="text-6xl font-headline font-black text-secondary">1802</p>
+</div>
+</div>
+</section>
+<!-- Aesthetic View Toggle -->
+<div class="px-6 mb-8">
+<div class="bg-surface-container-highest p-1 rounded-xl flex items-center max-w-[240px]">
+<button class="flex-1 py-2 px-4 rounded-lg text-sm font-bold bg-primary text-on-primary shadow-lg transition-all">
+                    Pitch
+                </button>
+<button class="flex-1 py-2 px-4 rounded-lg text-sm font-bold text-outline hover:text-on-surface transition-all">
+                    List
+                </button>
+</div>
+</div>
+<!-- Tactical Pitch View -->
+<section class="px-4 relative">
+<div class="pitch-gradient rounded-[2rem] aspect-[3/4] w-full relative overflow-hidden border-4 border-surface-container-highest shadow-2xl">
+<div class="absolute inset-0 pitch-lines opacity-20"></div>
+<!-- Tactical Grid (Simplified 4-3-3 representation) -->
+<div class="absolute inset-0 flex flex-col justify-between py-8 px-4 z-10">
+<!-- Goalkeeper -->
+<div class="flex justify-center">
+<div class="bg-surface-container-highest/90 backdrop-blur-md p-2 rounded-lg w-24 text-center border border-primary/20 shadow-xl group cursor-pointer hover:scale-105 transition-transform">
+<p class="text-[9px] font-bold text-outline leading-none mb-1">CHE</p>
+<p class="text-xs font-bold text-on-surface truncate">Sánchez</p>
+<div class="mt-2 bg-primary-container text-primary font-black py-0.5 rounded text-[10px]">6 pts</div>
+</div>
+</div>
+<!-- Defenders -->
+<div class="flex justify-around items-center">
+<div class="bg-surface-container-highest/90 backdrop-blur-md p-2 rounded-lg w-20 text-center border border-outline-variant/30 shadow-lg hover:scale-105 transition-transform">
+<p class="text-[9px] font-bold text-outline leading-none mb-1">ARS</p>
+<p class="text-xs font-bold text-on-surface truncate">White</p>
+<div class="mt-2 bg-surface-container text-on-surface font-black py-0.5 rounded text-[10px]">2 pts</div>
+</div>
+<div class="bg-surface-container-highest/90 backdrop-blur-md p-2 rounded-lg w-20 text-center border border-outline-variant/30 shadow-lg hover:scale-105 transition-transform translate-y-4">
+<p class="text-[9px] font-bold text-outline leading-none mb-1">MCI</p>
+<p class="text-xs font-bold text-on-surface truncate">Aké</p>
+<div class="mt-2 bg-surface-container text-on-surface font-black py-0.5 rounded text-[10px]">1 pts</div>
+</div>
+<div class="bg-surface-container-highest/90 backdrop-blur-md p-2 rounded-lg w-20 text-center border border-outline-variant/30 shadow-lg hover:scale-105 transition-transform">
+<p class="text-[9px] font-bold text-outline leading-none mb-1">LIV</p>
+<p class="text-xs font-bold text-on-surface truncate">Van Dijk</p>
+<div class="mt-2 bg-surface-container text-on-surface font-black py-0.5 rounded text-[10px]">2 pts</div>
+</div>
+</div>
+<!-- Midfielders -->
+<div class="flex justify-around items-center">
+<div class="bg-surface-container-highest/90 backdrop-blur-md p-2 rounded-lg w-20 text-center border border-outline-variant/30 shadow-lg hover:scale-105 transition-transform">
+<p class="text-[9px] font-bold text-outline leading-none mb-1">ARS</p>
+<p class="text-xs font-bold text-on-surface truncate">Saka</p>
+<div class="mt-2 bg-primary-container text-primary font-black py-0.5 rounded text-[10px]">8 pts</div>
+</div>
+<div class="bg-surface-container-highest/90 backdrop-blur-md p-2 rounded-lg w-20 text-center border border-secondary/40 shadow-lg scale-110 hover:scale-115 transition-transform z-20">
+<div class="absolute -top-2 -right-2 bg-secondary text-on-secondary text-[8px] font-black px-1 rounded-sm">C</div>
+<p class="text-[9px] font-bold text-outline leading-none mb-1">MCI</p>
+<p class="text-xs font-bold text-on-surface truncate">De Bruyne</p>
+<div class="mt-2 bg-surface-container text-on-surface font-black py-0.5 rounded text-[10px]">1 pts</div>
+</div>
+<div class="bg-surface-container-highest/90 backdrop-blur-md p-2 rounded-lg w-20 text-center border border-outline-variant/30 shadow-lg hover:scale-105 transition-transform">
+<p class="text-[9px] font-bold text-outline leading-none mb-1">AVL</p>
+<p class="text-xs font-bold text-on-surface truncate">Douglas L.</p>
+<div class="mt-2 bg-surface-container text-on-surface font-black py-0.5 rounded text-[10px]">3 pts</div>
+</div>
+</div>
+<!-- Forwards -->
+<div class="flex justify-around items-center pt-4">
+<div class="bg-surface-container-highest/90 backdrop-blur-md p-2 rounded-lg w-20 text-center border border-outline-variant/30 shadow-lg hover:scale-105 transition-transform">
+<p class="text-[9px] font-bold text-outline leading-none mb-1">MCI</p>
+<p class="text-xs font-bold text-on-surface truncate">Haaland</p>
+<div class="mt-2 bg-surface-container text-on-surface font-black py-0.5 rounded text-[10px]">2 pts</div>
+</div>
+<div class="bg-surface-container-highest/90 backdrop-blur-md p-2 rounded-lg w-20 text-center border border-outline-variant/30 shadow-lg hover:scale-105 transition-transform">
+<p class="text-[9px] font-bold text-outline leading-none mb-1">BHA</p>
+<p class="text-xs font-bold text-on-surface truncate">João Pedro</p>
+<div class="mt-2 bg-surface-container text-on-surface font-black py-0.5 rounded text-[10px]">1 pts</div>
+</div>
+<div class="bg-surface-container-highest/90 backdrop-blur-md p-2 rounded-lg w-20 text-center border border-outline-variant/30 shadow-lg hover:scale-105 transition-transform">
+<p class="text-[9px] font-bold text-outline leading-none mb-1">NEW</p>
+<p class="text-xs font-bold text-on-surface truncate">Isak</p>
+<div class="mt-2 bg-primary-container text-primary font-black py-0.5 rounded text-[10px]">12 pts</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Substitutes Bench -->
+<section class="mt-8 px-6">
+<div class="flex items-center gap-3 mb-4">
+<span class="material-symbols-outlined text-outline">event_seat</span>
+<h3 class="font-headline font-bold uppercase tracking-widest text-sm text-outline">Substitutes Bench</h3>
+</div>
+<div class="bg-surface-container-low p-4 rounded-2xl flex justify-between gap-3 border border-outline-variant/10">
+<div class="flex-1 flex flex-col items-center p-2 bg-surface-container rounded-lg opacity-60">
+<p class="text-[8px] font-bold text-outline mb-1">ARS</p>
+<p class="text-[10px] font-bold text-on-surface truncate">Raya</p>
+<div class="mt-1 w-full text-center py-0.5 bg-surface-container-highest rounded text-[9px] font-bold text-outline">-</div>
+</div>
+<div class="flex-1 flex flex-col items-center p-2 bg-surface-container rounded-lg">
+<p class="text-[8px] font-bold text-outline mb-1">TOT</p>
+<p class="text-[10px] font-bold text-on-surface truncate">Porro</p>
+<div class="mt-1 w-full text-center py-0.5 bg-primary-container text-primary rounded text-[9px] font-bold">1 pts</div>
+</div>
+<div class="flex-1 flex flex-col items-center p-2 bg-surface-container rounded-lg">
+<p class="text-[8px] font-bold text-outline mb-1">MUN</p>
+<p class="text-[10px] font-bold text-on-surface truncate">Garnacho</p>
+<div class="mt-1 w-full text-center py-0.5 bg-surface-container-highest text-on-surface rounded text-[9px] font-bold">0 pts</div>
+</div>
+<div class="flex-1 flex flex-col items-center p-2 bg-surface-container rounded-lg opacity-40">
+<p class="text-[8px] font-bold text-outline mb-1">LIV</p>
+<p class="text-[10px] font-bold text-on-surface truncate">Gomez</p>
+<div class="mt-1 w-full text-center py-0.5 bg-surface-container-highest rounded text-[9px] font-bold text-outline">-</div>
+</div>
+</div>
+</section>
+<!-- GW Transfers Info -->
+<section class="mt-6 px-6">
+<div class="bg-surface-container-high rounded-2xl p-6 flex items-center justify-between">
+<div class="flex items-center gap-4">
+<div class="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
+<span class="material-symbols-outlined text-primary text-3xl">swap_horizontal_circle</span>
+</div>
+<div>
+<p class="text-on-surface font-bold text-lg">GW Transfers</p>
+<p class="text-outline text-sm">2 used, -4 pts hit</p>
+</div>
+</div>
+<button class="bg-primary-container text-primary p-3 rounded-full hover:bg-primary hover:text-on-primary transition-colors">
+<span class="material-symbols-outlined">chevron_right</span>
+</button>
+</div>
+</section>
+</main>
+<!-- Bottom Navigation Anchor (from JSON) -->
+<nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center pb-safe pt-2 px-4 bg-[#131313]/90 backdrop-blur-xl border-t border-[#353535]/15 shadow-[0_-8px_24px_rgba(0,0,0,0.2)] rounded-t-[1.5rem]">
+<a class="flex flex-col items-center justify-center bg-[#2d5a27] text-[#a1d494] rounded-xl px-4 py-2 active:scale-90 transition-all hover:text-[#ffe083]" href="#">
+<span class="material-symbols-outlined">sports_soccer</span>
+<span class="font-['Manrope'] text-[10px] font-semibold uppercase tracking-widest mt-1">Pitch</span>
+</a>
+<a class="flex flex-col items-center justify-center text-[#353535] px-4 py-2 active:scale-90 transition-all hover:text-[#ffe083]" href="#">
+<span class="material-symbols-outlined">leaderboard</span>
+<span class="font-['Manrope'] text-[10px] font-semibold uppercase tracking-widest mt-1">Leagues</span>
+</a>
+<a class="flex flex-col items-center justify-center text-[#353535] px-4 py-2 active:scale-90 transition-all hover:text-[#ffe083]" href="#">
+<span class="material-symbols-outlined">swap_horizontal_circle</span>
+<span class="font-['Manrope'] text-[10px] font-semibold uppercase tracking-widest mt-1">Transfers</span>
+</a>
+<a class="flex flex-col items-center justify-center text-[#353535] px-4 py-2 active:scale-90 transition-all hover:text-[#ffe083]" href="#">
+<span class="material-symbols-outlined">query_stats</span>
+<span class="font-['Manrope'] text-[10px] font-semibold uppercase tracking-widest mt-1">Status</span>
+</a>
+</nav>
+</body></html>

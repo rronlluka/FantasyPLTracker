@@ -1,22 +1,23 @@
 package com.fpl.tracker.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -24,12 +25,23 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.material.icons.filled.SportsSoccer
+import androidx.compose.material.icons.filled.Leaderboard
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import android.util.Log
 import com.fpl.tracker.data.repository.FPLRepository
 import com.fpl.tracker.ui.components.FootballPitch
 import com.fpl.tracker.ui.components.PlayerDetailDialog
+import com.fpl.tracker.ui.components.getTeamColor
+import com.fpl.tracker.ui.components.getTeamTextColor
+import com.fpl.tracker.ui.theme.*
 
 import com.fpl.tracker.viewmodel.ManagerFormationViewModel
 import com.fpl.tracker.viewmodel.PlayerWithDetails
@@ -51,7 +63,7 @@ fun ManagerFormationScreen(
     val context = LocalContext.current
     val prefsManager = remember { PreferencesManager(context) }
     val uiState by viewModel.uiState.collectAsState()
-    
+
     var selectedPlayer by remember { mutableStateOf<PlayerWithDetails?>(null) }
     var showPlayerDialog by remember { mutableStateOf(false) }
     var playerDetail by remember { mutableStateOf<com.fpl.tracker.data.models.PlayerDetailResponse?>(null) }
@@ -61,15 +73,14 @@ fun ManagerFormationScreen(
     var isLoadingPlayerData by remember { mutableStateOf(false) }
     var playerRequestId by remember { mutableIntStateOf(0) }
     var isPitchView by remember { mutableStateOf(true) }
+    var showTransfersDialog by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val repository = remember { FPLRepository() }
     val formationTitle = teamName.takeIf { it.isNotBlank() } ?: "Team Formation"
-    
+
     LaunchedEffect(managerId, eventId) {
         viewModel.loadManagerFormation(managerId, eventId)
-        // Fetch transfers once for this screen.
         val transfersDeferred = async { repository.getManagerTransfers(managerId).getOrNull() }
-
         gwTransfers = transfersDeferred.await()
             ?.filter { it.event == eventId }
             ?: emptyList()
@@ -79,33 +90,31 @@ fun ManagerFormationScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Column {
-                        Text(
-                            text = formationTitle,
-                            style = MaterialTheme.typography.titleLarge,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Text(
-                            text = "GW$eventId",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
+                    Text(
+                        text = formationTitle,
+                        fontFamily = SpaceGrotesk,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 18.sp,
+                        color = OnSurfaceE5E2E1,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            "Back",
+                            tint = PrimaryA1D494
+                        )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface,
-                    titleContentColor = MaterialTheme.colorScheme.onSurface,
-                    navigationIconContentColor = MaterialTheme.colorScheme.onSurface
+                    containerColor = Surface131313
                 )
             )
-        }
+        },
+        containerColor = Surface131313
     ) { paddingValues ->
         Box(
             modifier = Modifier
@@ -115,7 +124,8 @@ fun ManagerFormationScreen(
             when {
                 uiState.isLoading -> {
                     CircularProgressIndicator(
-                        modifier = Modifier.align(Alignment.Center)
+                        modifier = Modifier.align(Alignment.Center),
+                        color = PrimaryA1D494
                     )
                 }
                 uiState.error != null -> {
@@ -127,10 +137,16 @@ fun ManagerFormationScreen(
                     ) {
                         Text(
                             text = "Error: ${uiState.error}",
-                            color = MaterialTheme.colorScheme.error
+                            color = ErrorFFB4AB
                         )
                         Spacer(modifier = Modifier.height(16.dp))
-                        Button(onClick = { viewModel.loadManagerFormation(managerId, eventId) }) {
+                        Button(
+                            onClick = { viewModel.loadManagerFormation(managerId, eventId) },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = PrimaryContainer2D5A27,
+                                contentColor = PrimaryA1D494
+                            )
+                        ) {
                             Text("Retry")
                         }
                     }
@@ -142,153 +158,183 @@ fun ManagerFormationScreen(
                     val usedChips = remember(uiState.managerHistory?.chips) {
                         buildUsedChips(uiState.managerHistory?.chips)
                     }
-                    
-                    // Split players into starting XI and bench
+
                     val startingXI = playersWithDetails.filter { it.pick.position <= 11 }
                     val bench = playersWithDetails.filter { it.pick.position > 11 }
-                    
+
+                    var livePoints = 0
+                    startingXI.forEach { pd ->
+                        if (pd.isLive && pd.liveStats != null) {
+                            var pts = pd.liveStats.stats.totalPoints
+                            val currentBonus = pd.liveStats.stats.bonus
+                            val provisionalBonusPoints = uiState.provisionalBonus[pd.player.id] ?: 0
+                            if (currentBonus == 0 && provisionalBonusPoints > 0) {
+                                pts += provisionalBonusPoints
+                            }
+                            livePoints += pts * pd.pick.multiplier
+                        }
+                    }
+
+                    val totalGwPoints = managerPicks.entryHistory.points + livePoints
+                    val hasLive = startingXI.any { it.isLive }
+
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
                             .verticalScroll(rememberScrollState())
-                            .padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        // Summary Card
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-                            colors = CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.surfaceContainer
-                            )
-                        ) {
-                            // Calculate live points - ONLY for truly live games (not yet finished by FPL)
-                            // For historical GWs all fixtures are finished, so livePoints stays 0
-                            // and entryHistory.points is already the correct final total.
-                            var livePoints = 0
-                            startingXI.forEach { playerDetail ->
-                                // Only count if the game is truly in-progress (isLive), not for
-                                // finished games (including historical GW lookups)
-                                if (playerDetail.isLive && playerDetail.liveStats != null) {
-                                    var pts = playerDetail.liveStats.stats.totalPoints
-
-                                    // Add provisional bonus if player doesn't have bonus yet
-                                    val currentBonus = playerDetail.liveStats.stats.bonus
-                                    val provisionalBonusPoints = uiState.provisionalBonus[playerDetail.player.id] ?: 0
-                                    if (currentBonus == 0 && provisionalBonusPoints > 0) {
-                                        pts += provisionalBonusPoints
-                                    }
-
-                                    livePoints += pts * playerDetail.pick.multiplier
-                                }
-                            }
-                            
-                            val totalGwPoints = managerPicks.entryHistory.points + livePoints
-                            
-                            Column(modifier = Modifier.padding(16.dp)) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceAround
-                                ) {
-                                    StatItem(
-                                        label = "GW Points",
-                                        value = "$totalGwPoints",
-                                        highlighted = true
-                                    )
-                                    StatItem(
-                                        label = "Total Points",
-                                        value = "${managerPicks.entryHistory.totalPoints + livePoints}"
-                                    )
-                                    StatItem(
-                                        label = "GW Rank",
-                                        value = managerPicks.entryHistory.rank?.let { 
-                                            "#${String.format("%,d", it)}" 
-                                        } ?: "N/A"
-                                    )
-                                }
-                                
-                                if (livePoints > 0) {
-                                    Spacer(modifier = Modifier.height(8.dp))
+                        // ── Dashboard Header ────────────────────────────────
+                        Column(modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.Bottom
+                            ) {
+                                Column {
                                     Text(
-                                        text = "🔴 Live: +$livePoints pts from ${startingXI.count { it.isLive }} players",
-                                        color = MaterialTheme.colorScheme.primary,
+                                        text = "GAMEWEEK $eventId",
+                                        color = PrimaryA1D494,
                                         fontSize = 12.sp,
-                                        modifier = Modifier.align(Alignment.CenterHorizontally)
+                                        fontFamily = Manrope,
+                                        fontWeight = FontWeight.Bold,
+                                        letterSpacing = 3.sp
                                     )
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(
+                                        text = formationTitle,
+                                        color = OnSurfaceE5E2E1,
+                                        fontSize = 36.sp,
+                                        fontFamily = SpaceGrotesk,
+                                        fontWeight = FontWeight.ExtraBold,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                                if (hasLive) {
+                                    Box(
+                                        modifier = Modifier
+                                            .background(
+                                                TertiaryContainerA40217,
+                                                RoundedCornerShape(50)
+                                            )
+                                            .padding(horizontal = 10.dp, vertical = 4.dp)
+                                    ) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(6.dp)
+                                                    .background(Color.White, CircleShape)
+                                            )
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Text(
+                                                text = "LIVE",
+                                                color = Color.White,
+                                                fontSize = 10.sp,
+                                                fontFamily = SpaceGrotesk,
+                                                fontWeight = FontWeight.Bold,
+                                                letterSpacing = 1.sp
+                                            )
+                                        }
+                                    }
                                 }
                             }
                         }
-                        
-                        // Additional info
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-                            colors = CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.surfaceContainerLow
-                            )
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(12.dp),
-                                horizontalArrangement = Arrangement.SpaceEvenly
-                            ) {
-                                Text(
-                                    "Transfers: ${managerPicks.entryHistory.eventTransfers}",
-                                    style = MaterialTheme.typography.bodyMedium
-                                )
-                                Text(
-                                    "Cost: ${managerPicks.entryHistory.eventTransfersCost}",
-                                    style = MaterialTheme.typography.bodyMedium
-                                )
-                                Text(
-                                    "Bench: ${managerPicks.entryHistory.pointsOnBench}",
-                                    style = MaterialTheme.typography.bodyMedium
-                                )
-                            }
-                        }
 
-                        ManagerChipsCard(
-                            usedChips = usedChips,
-                            activeChip = managerPicks.activeChip
-                        )
+                        Spacer(modifier = Modifier.height(16.dp))
 
-                        // Starting XI - Pitch View or List View
+                        // ── Stats Grid ──────────────────────────────────────
                         Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 24.dp),
+                            horizontalArrangement = Arrangement.spacedBy(16.dp)
                         ) {
-                            Text(
-                                text = "Starting XI",
-                                style = MaterialTheme.typography.titleLarge,
-                                fontWeight = FontWeight.Bold
+                            StitchStatCard(
+                                label = "GW POINTS",
+                                value = "$totalGwPoints",
+                                valueColor = PrimaryA1D494,
+                                icon = {
+                                    Icon(
+                                        imageVector = Icons.Default.SportsSoccer,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(72.dp),
+                                        tint = OnSurfaceE5E2E1.copy(alpha = 0.08f)
+                                    )
+                                },
+                                modifier = Modifier.weight(1f)
                             )
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically
+                            StitchStatCard(
+                                label = "TOTAL SCORE",
+                                value = "${managerPicks.entryHistory.totalPoints + livePoints}",
+                                valueColor = SecondaryFFE083,
+                                icon = {
+                                    Icon(
+                                        imageVector = Icons.Default.Leaderboard,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(72.dp),
+                                        tint = OnSurfaceE5E2E1.copy(alpha = 0.08f)
+                                    )
+                                },
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(20.dp))
+
+                        // ── Pill View Toggle ────────────────────────────────
+                        Row(
+                            modifier = Modifier
+                                .padding(horizontal = 24.dp)
+                                .background(
+                                    SurfaceContainerHighest353535,
+                                    RoundedCornerShape(12.dp)
+                                )
+                                .padding(4.dp)
+                                .width(200.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(
+                                        if (isPitchView) PrimaryA1D494 else Color.Transparent
+                                    )
+                                    .clickable { isPitchView = true }
+                                    .padding(vertical = 8.dp),
+                                contentAlignment = Alignment.Center
                             ) {
                                 Text(
-                                    text = if (isPitchView) "Pitch" else "List",
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Medium
+                                    text = "Pitch",
+                                    color = if (isPitchView) OnPrimary0A3909 else Outline8C9387,
+                                    fontSize = 14.sp,
+                                    fontFamily = SpaceGrotesk,
+                                    fontWeight = FontWeight.Bold
                                 )
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Switch(
-                                    checked = isPitchView,
-                                    onCheckedChange = { isPitchView = it },
-                                    colors = SwitchDefaults.colors(
-                                        checkedThumbColor = MaterialTheme.colorScheme.onSurface,
-                                        checkedTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.65f),
-                                        uncheckedThumbColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        uncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant
-                                    ),
-                                    modifier = Modifier.height(24.dp)
+                            }
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(
+                                        if (!isPitchView) PrimaryA1D494 else Color.Transparent
+                                    )
+                                    .clickable { isPitchView = false }
+                                    .padding(vertical = 8.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "List",
+                                    color = if (!isPitchView) OnPrimary0A3909 else Outline8C9387,
+                                    fontSize = 14.sp,
+                                    fontFamily = SpaceGrotesk,
+                                    fontWeight = FontWeight.Bold
                                 )
                             }
                         }
 
-                        // Shared click handler for player clicks
+                        Spacer(modifier = Modifier.height(20.dp))
+
+                        // ── Player Click Handler ────────────────────────────
                         val handlePlayerClick: (PlayerWithDetails) -> Unit = { playerWithDetails ->
                             val requestId = playerRequestId + 1
                             playerRequestId = requestId
@@ -315,10 +361,8 @@ fun ManagerFormationScreen(
                                             Result.failure(Exception("No league selected for league-scoped stats"))
                                         }
                                     }
-
                                     val detail = detailDeferred.await()
                                     val statsResult = statsDeferred.await()
-
                                     if (playerRequestId == requestId &&
                                         selectedPlayer?.player?.id == playerWithDetails.player.id
                                     ) {
@@ -339,21 +383,49 @@ fun ManagerFormationScreen(
                             }
                         }
 
+                        // ── Pitch or List View ──────────────────────────────
                         if (isPitchView) {
                             FootballPitch(
                                 startingXI = startingXI,
                                 provisionalBonus = uiState.provisionalBonus,
                                 onPlayerClick = handlePlayerClick,
-                                modifier = Modifier.fillMaxWidth()
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp)
                             )
                         } else {
-                            // List View
+                            // List View Header
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 20.dp, vertical = 4.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = "PLAYER / FIXTURE",
+                                    color = Outline8C9387,
+                                    fontSize = 10.sp,
+                                    fontFamily = Manrope,
+                                    fontWeight = FontWeight.Bold,
+                                    letterSpacing = 2.sp
+                                )
+                                Text(
+                                    text = "POINTS",
+                                    color = Outline8C9387,
+                                    fontSize = 10.sp,
+                                    fontFamily = Manrope,
+                                    fontWeight = FontWeight.Bold,
+                                    letterSpacing = 2.sp
+                                )
+                            }
                             Column(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
                                 startingXI.forEach { playerWithDetails ->
-                                    PlayerListRow(
+                                    StitchPlayerListRow(
                                         playerDetail = playerWithDetails,
                                         provisionalBonus = uiState.provisionalBonus,
                                         onPlayerClick = handlePlayerClick
@@ -362,231 +434,148 @@ fun ManagerFormationScreen(
                             }
                         }
 
-                        // Bench Section
-                        Text(
-                            text = "Substitutes",
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold
-                        )
-                        
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-                            colors = CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.surfaceContainer
-                            )
+                        Spacer(modifier = Modifier.height(24.dp))
+
+                        // ── Substitutes Bench ───────────────────────────────
+                        Row(
+                            modifier = Modifier.padding(horizontal = 24.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
+                            Text(
+                                text = "SUBSTITUTES BENCH",
+                                color = Outline8C9387,
+                                fontSize = 12.sp,
+                                fontFamily = SpaceGrotesk,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 3.sp
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 24.dp)
+                                .background(
+                                    SurfaceContainerLow1C1B1B,
+                                    RoundedCornerShape(16.dp)
+                                )
+                                .border(
+                                    1.dp,
+                                    OutlineVariant42493E.copy(alpha = 0.1f),
+                                    RoundedCornerShape(16.dp)
+                                )
+                                .padding(12.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            bench.forEach { benchPlayer ->
+                                StitchBenchCard(
+                                    playerDetail = benchPlayer,
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        // ── Chips Card ──────────────────────────────────────
+                        ManagerChipsCard(
+                            usedChips = usedChips,
+                            activeChip = managerPicks.activeChip,
+                            modifier = Modifier.padding(horizontal = 24.dp)
+                        )
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        // ── GW Transfers Clickable Summary ──────────────────
+                        if (gwTransfers.isNotEmpty() || managerPicks.entryHistory.eventTransfers > 0) {
+                            val transferCost = managerPicks.entryHistory.eventTransfersCost
+                            val transferCount = managerPicks.entryHistory.eventTransfers
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(12.dp),
-                                horizontalArrangement = Arrangement.SpaceEvenly
-                            ) {
-                                bench.forEachIndexed { index, benchPlayer ->
-                                    BenchPlayerCard(
-                                        playerDetail = benchPlayer,
-                                        position = if (index == 0) "GKP" else "${index}. ${
-                                            when(benchPlayer.player.elementType) {
-                                                2 -> "DEF"
-                                                3 -> "MID"
-                                                4 -> "FWD"
-                                                else -> "SUB"
-                                            }
-                                        }",
-                                        onPlayerClick = handlePlayerClick
+                                    .padding(horizontal = 24.dp)
+                                    .background(
+                                        SurfaceContainerHigh2A2A2A,
+                                        RoundedCornerShape(16.dp)
                                     )
-                                }
-                            }
-                        }
-
-                        // GW Transfers Section
-                        if (gwTransfers.isNotEmpty()) {
-                            val transferCost = managerPicks.entryHistory.eventTransfersCost
-                            Card(
-                                modifier = Modifier.fillMaxWidth(),
-                                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-                                colors = CardDefaults.cardColors(
-                                    containerColor = MaterialTheme.colorScheme.surfaceContainer
-                                )
+                                    .clickable(enabled = gwTransfers.isNotEmpty()) {
+                                        showTransfersDialog = true
+                                    }
+                                    .padding(20.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                Column(modifier = Modifier.padding(16.dp)) {
-                                    // Header row
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(48.dp)
+                                            .background(
+                                                PrimaryA1D494.copy(alpha = 0.1f),
+                                                RoundedCornerShape(12.dp)
+                                            ),
+                                        contentAlignment = Alignment.Center
                                     ) {
                                         Text(
-                                            text = "GW Transfers",
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 16.sp,
-                                            color = MaterialTheme.colorScheme.onSurface
+                                            "⇄",
+                                            color = PrimaryA1D494,
+                                            fontSize = 22.sp
                                         )
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                        ) {
-                                            Box(
-                                                modifier = Modifier
-                                                    .background(
-                                                        MaterialTheme.colorScheme.surfaceVariant,
-                                                        RoundedCornerShape(12.dp)
-                                                    )
-                                                    .padding(horizontal = 8.dp, vertical = 3.dp)
-                                            ) {
-                                                Text(
-                                                    text = "${gwTransfers.size} transfer${if (gwTransfers.size > 1) "s" else ""}",
-                                                    fontSize = 11.sp,
-                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                    fontWeight = FontWeight.SemiBold
-                                                )
-                                            }
-                                            Box(
-                                                modifier = Modifier
-                                                    .background(
-                                                        if (transferCost > 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
-                                                        RoundedCornerShape(12.dp)
-                                                    )
-                                                    .padding(horizontal = 8.dp, vertical = 3.dp)
-                                            ) {
-                                                Text(
-                                                    text = if (transferCost > 0) "-${transferCost}pts" else "Free",
-                                                    fontSize = 11.sp,
-                                                    color = Color.White,
-                                                    fontWeight = FontWeight.Bold
-                                                )
-                                            }
-                                        }
                                     }
-
-                                    Spacer(modifier = Modifier.height(14.dp))
-
-                                    gwTransfers.forEachIndexed { index, transfer ->
-                                        val playerIn = bootstrap.elements.find { it.id == transfer.elementIn }
-                                        val playerOut = bootstrap.elements.find { it.id == transfer.elementOut }
-                                        val teamIn = playerIn?.let { p -> bootstrap.teams.find { it.id == p.team } }
-                                        val teamOut = playerOut?.let { p -> bootstrap.teams.find { it.id == p.team } }
-
-                                        if (index > 0) {
-                                            HorizontalDivider(
-                                                modifier = Modifier.padding(vertical = 10.dp),
-                                                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
-                                            )
-                                        }
-
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            // OUT player
-                                            Column(
-                                                modifier = Modifier.weight(1f),
-                                                horizontalAlignment = Alignment.CenterHorizontally
-                                            ) {
-                                                Box(
-                                                    modifier = Modifier
-                                                        .size(40.dp)
-                                                        .background(
-                                                            color = if (teamOut != null) com.fpl.tracker.ui.components.getTeamColor(teamOut.id) else MaterialTheme.colorScheme.error.copy(alpha = 0.3f),
-                                                            shape = RoundedCornerShape(10.dp)
-                                                        ),
-                                                    contentAlignment = Alignment.Center
-                                                ) {
-                                                    Text(
-                                                        text = teamOut?.shortName ?: "?",
-                                                        color = if (teamOut != null) com.fpl.tracker.ui.components.getTeamTextColor(teamOut.id) else Color.White,
-                                                        fontSize = 10.sp,
-                                                        fontWeight = FontWeight.Bold
-                                                    )
-                                                }
-                                                Spacer(modifier = Modifier.height(5.dp))
-                                                Text(
-                                                    text = playerOut?.webName ?: "Unknown",
-                                                    fontSize = 12.sp,
-                                                    fontWeight = FontWeight.SemiBold,
-                                                    color = MaterialTheme.colorScheme.error,
-                                                    textAlign = TextAlign.Center,
-                                                    maxLines = 2,
-                                                    overflow = TextOverflow.Ellipsis
-                                                )
-                                                Text(
-                                                    text = "£${transfer.elementOutCost / 10.0}m",
-                                                    fontSize = 10.sp,
-                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                                )
-                                            }
-
-                                            // Arrow
-                                            Column(
-                                                modifier = Modifier.padding(horizontal = 10.dp),
-                                                horizontalAlignment = Alignment.CenterHorizontally,
-                                                verticalArrangement = Arrangement.Center
-                                            ) {
-                                                Text(
-                                                    text = "→",
-                                                    color = MaterialTheme.colorScheme.secondary,
-                                                    fontSize = 22.sp,
-                                                    fontWeight = FontWeight.Bold
-                                                )
-                                            }
-
-                                            // IN player
-                                            Column(
-                                                modifier = Modifier.weight(1f),
-                                                horizontalAlignment = Alignment.CenterHorizontally
-                                            ) {
-                                                Box(
-                                                    modifier = Modifier
-                                                        .size(40.dp)
-                                                        .background(
-                                                            color = if (teamIn != null) com.fpl.tracker.ui.components.getTeamColor(teamIn.id) else MaterialTheme.colorScheme.primary.copy(alpha = 0.3f),
-                                                            shape = RoundedCornerShape(10.dp)
-                                                        ),
-                                                    contentAlignment = Alignment.Center
-                                                ) {
-                                                    Text(
-                                                        text = teamIn?.shortName ?: "?",
-                                                        color = if (teamIn != null) com.fpl.tracker.ui.components.getTeamTextColor(teamIn.id) else Color.White,
-                                                        fontSize = 10.sp,
-                                                        fontWeight = FontWeight.Bold
-                                                    )
-                                                }
-                                                Spacer(modifier = Modifier.height(5.dp))
-                                                Text(
-                                                    text = playerIn?.webName ?: "Unknown",
-                                                    fontSize = 12.sp,
-                                                    fontWeight = FontWeight.SemiBold,
-                                                    color = MaterialTheme.colorScheme.primary,
-                                                    textAlign = TextAlign.Center,
-                                                    maxLines = 2,
-                                                    overflow = TextOverflow.Ellipsis
-                                                )
-                                                Text(
-                                                    text = "£${transfer.elementInCost / 10.0}m",
-                                                    fontSize = 10.sp,
-                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                                )
-                                            }
-                                        }
+                                    Spacer(modifier = Modifier.width(16.dp))
+                                    Column {
+                                        Text(
+                                            text = "GW Transfers",
+                                            color = OnSurfaceE5E2E1,
+                                            fontSize = 16.sp,
+                                            fontFamily = SpaceGrotesk,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        Text(
+                                            text = "$transferCount used" +
+                                                    if (transferCost > 0) ", -${transferCost} pts hit" else ", Free",
+                                            color = Outline8C9387,
+                                            fontSize = 13.sp,
+                                            fontFamily = Manrope
+                                        )
+                                    }
+                                }
+                                if (gwTransfers.isNotEmpty()) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(40.dp)
+                                            .background(
+                                                PrimaryContainer2D5A27,
+                                                CircleShape
+                                            ),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            "›",
+                                            color = PrimaryA1D494,
+                                            fontSize = 24.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
                                     }
                                 }
                             }
                         }
+
+                        Spacer(modifier = Modifier.height(32.dp))
                     }
                 }
             }
-            
-            // Only block the full screen if the dialog has not opened yet.
+
+            // ── Loading overlay ─────────────────────────────────────
             if (isLoadingPlayerData && !showPlayerDialog) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(MaterialTheme.colorScheme.onBackground.copy(alpha = 0.45f)),
+                        .background(Surface131313.copy(alpha = 0.85f)),
                     contentAlignment = Alignment.Center
                 ) {
                     Card(
                         colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surface
+                            containerColor = SurfaceContainerHigh2A2A2A
                         ),
                         shape = RoundedCornerShape(16.dp)
                     ) {
@@ -594,27 +583,26 @@ fun ManagerFormationScreen(
                             modifier = Modifier.padding(32.dp),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            CircularProgressIndicator(
-                                color = MaterialTheme.colorScheme.primary
-                            )
+                            CircularProgressIndicator(color = PrimaryA1D494)
                             Spacer(modifier = Modifier.height(16.dp))
                             Text(
                                 "Loading player data...",
                                 fontWeight = FontWeight.Bold,
-                                fontSize = 16.sp
+                                fontSize = 16.sp,
+                                color = OnSurfaceE5E2E1
                             )
                             Spacer(modifier = Modifier.height(8.dp))
                             Text(
                                 selectedPlayer?.player?.webName ?: "",
                                 fontSize = 14.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = OnSurfaceVariantC2C9BB
                             )
                         }
                     }
                 }
             }
-            
-            // Show player detail dialog only after data is loaded
+
+            // ── Player Detail Dialog ────────────────────────────────
             if (showPlayerDialog && selectedPlayer != null) {
                 PlayerDetailDialog(
                     player = selectedPlayer!!.player,
@@ -624,6 +612,7 @@ fun ManagerFormationScreen(
                     bootstrapData = uiState.bootstrapData,
                     currentEvent = eventId,
                     liveStats = selectedPlayer!!.liveStats,
+                    fixture = selectedPlayer!!.fixture,
                     isLoadingLeagueStats = isLoadingPlayerData,
                     leagueStatsError = leagueStatsError,
                     onDismiss = {
@@ -635,147 +624,686 @@ fun ManagerFormationScreen(
                     }
                 )
             }
+
+            // ── Transfers Detail Dialog ─────────────────────────────
+            if (showTransfersDialog && gwTransfers.isNotEmpty() && uiState.bootstrapData != null) {
+                TransfersDetailDialog(
+                    eventId = eventId,
+                    transfers = gwTransfers,
+                    transferCost = uiState.managerPicks?.entryHistory?.eventTransfersCost ?: 0,
+                    activeChip = uiState.managerPicks?.activeChip,
+                    bootstrapData = uiState.bootstrapData!!,
+                    onDismiss = { showTransfersDialog = false }
+                )
+            }
         }
     }
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// Stitch Stat Card
+// ═══════════════════════════════════════════════════════════════════════════════
+
 @Composable
-fun StatItem(
+private fun StitchStatCard(
     label: String,
     value: String,
-    highlighted: Boolean = false
+    valueColor: Color,
+    icon: @Composable () -> Unit,
+    modifier: Modifier = Modifier
 ) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(SurfaceContainerLow1C1B1B)
+            .border(
+                1.dp,
+                OutlineVariant42493E.copy(alpha = 0.1f),
+                RoundedCornerShape(12.dp)
+            )
     ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodySmall,
-            color = if (highlighted)
-                MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.85f)
-            else
-                MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.6f)
-        )
-        Spacer(modifier = Modifier.height(4.dp))
-        Text(
-            text = value,
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.Bold,
-            color = if (highlighted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSecondaryContainer
-        )
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .offset(x = 8.dp, y = (-8).dp)
+        ) {
+            icon()
+        }
+        Column(modifier = Modifier.padding(20.dp)) {
+            Text(
+                text = label,
+                color = Outline8C9387,
+                fontSize = 10.sp,
+                fontFamily = Manrope,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 2.sp
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = value,
+                color = valueColor,
+                fontSize = 42.sp,
+                fontFamily = SpaceGrotesk,
+                fontWeight = FontWeight.Black
+            )
+        }
     }
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// Stitch Player List Row
+// ═══════════════════════════════════════════════════════════════════════════════
+
 @Composable
-fun BenchPlayerCard(
+fun StitchPlayerListRow(
     playerDetail: PlayerWithDetails,
-    position: String,
+    provisionalBonus: Map<Int, Int> = emptyMap(),
     onPlayerClick: ((PlayerWithDetails) -> Unit)? = null
 ) {
+    val isCaptain = playerDetail.pick.isCaptain
+    val isViceCaptain = playerDetail.pick.isViceCaptain
+    val isSub = playerDetail.pick.position > 11
+
+    var points = if (playerDetail.hasLivePoints && playerDetail.liveStats != null) {
+        playerDetail.liveStats.stats.totalPoints
+    } else {
+        playerDetail.player.eventPoints
+    }
+    if (playerDetail.hasLivePoints && playerDetail.liveStats != null) {
+        val currentBonus = playerDetail.liveStats.stats.bonus
+        val provisionalBonusPoints = provisionalBonus[playerDetail.player.id] ?: 0
+        if (currentBonus == 0 && provisionalBonusPoints > 0) {
+            points += provisionalBonusPoints
+        }
+    }
+    val displayPoints = points * playerDetail.pick.multiplier
+
+    val isHome = playerDetail.fixture?.teamH == playerDetail.team.id
+
+    val fixture = playerDetail.fixture
+    val statusText: String
+    when {
+        fixture == null -> statusText = "No fix"
+        fixture.finished -> statusText = "FT"
+        fixture.started == true -> statusText = "LIVE ${fixture.minutes}'"
+        fixture.kickoffTime != null -> {
+            statusText = try {
+                val instant = java.time.Instant.parse(fixture.kickoffTime)
+                val zdt = instant.atZone(java.time.ZoneId.systemDefault())
+                val dayAbbrev = zdt.dayOfWeek.getDisplayName(
+                    java.time.format.TextStyle.SHORT,
+                    java.util.Locale.getDefault()
+                ).uppercase()
+                val time = "%02d:%02d".format(zdt.hour, zdt.minute)
+                "$dayAbbrev $time"
+            } catch (_: Exception) {
+                fixture.kickoffTime.take(10)
+            }
+        }
+        else -> statusText = "TBC"
+    }
+
+    val positionLabel = when (playerDetail.player.elementType) {
+        1 -> "GK"
+        2 -> "DEF"
+        3 -> "MID"
+        4 -> "FWD"
+        else -> "SUB"
+    }
+
+    val accentColor = when {
+        isSub -> OutlineVariant42493E
+        isCaptain -> SecondaryFFE083
+        displayPoints >= 10 -> PrimaryA1D494
+        else -> PrimaryContainer2D5A27
+    }
+
+    val chipLabel = if (isCaptain) "$positionLabel (C)"
+    else if (isViceCaptain) "$positionLabel (V)"
+    else if (isSub) "SUB"
+    else positionLabel
+
+    val chipBg = when {
+        isCaptain -> SecondaryFFE083
+        isSub -> OutlineVariant42493E
+        else -> SurfaceVariant353535
+    }
+    val chipFg = when {
+        isCaptain -> OnSecondary3C2F00
+        isSub -> Surface131313
+        else -> OnSurfaceVariantC2C9BB
+    }
+
+    val useGradient = displayPoints >= 6 && !isSub
+    val pointsCircleBg = if (useGradient) {
+        Brush.linearGradient(listOf(PrimaryA1D494, PrimaryContainer2D5A27))
+    } else {
+        Brush.linearGradient(listOf(SurfaceContainerHighest353535, SurfaceContainerHighest353535))
+    }
+    val pointsFg = if (useGradient) OnPrimary0A3909 else if (isSub) Outline8C9387 else OnSurfaceE5E2E1
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(SurfaceContainerLow1C1B1B, RoundedCornerShape(12.dp))
+            .then(
+                if (onPlayerClick != null) Modifier.clickable { onPlayerClick(playerDetail) } else Modifier
+            )
+            .padding(start = 0.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Left accent bar
+        Box(
+            modifier = Modifier
+                .width(3.dp)
+                .height(72.dp)
+                .background(accentColor, RoundedCornerShape(topStart = 12.dp, bottomStart = 12.dp))
+        )
+
+        Spacer(modifier = Modifier.width(12.dp))
+
+        // Team color square
+        Box(
+            modifier = Modifier
+                .size(48.dp)
+                .background(
+                    getTeamColor(playerDetail.team.id),
+                    RoundedCornerShape(8.dp)
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = playerDetail.team.shortName.take(3).uppercase(),
+                color = getTeamTextColor(playerDetail.team.id),
+                fontSize = 10.sp,
+                fontFamily = Manrope,
+                fontWeight = FontWeight.ExtraBold
+            )
+        }
+
+        Spacer(modifier = Modifier.width(12.dp))
+
+        Column(modifier = Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = playerDetail.player.webName,
+                    color = OnSurfaceE5E2E1,
+                    fontSize = 16.sp,
+                    fontFamily = SpaceGrotesk,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Box(
+                    modifier = Modifier
+                        .background(chipBg, RoundedCornerShape(4.dp))
+                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                ) {
+                    Text(
+                        text = chipLabel,
+                        color = chipFg,
+                        fontSize = 10.sp,
+                        fontFamily = Manrope,
+                        fontWeight = FontWeight.Black
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(4.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                playerDetail.opponentTeam?.let { opp ->
+                    val venue = if (isHome) "vs" else "@"
+                    Text(
+                        text = "${playerDetail.team.shortName} $venue ${opp.shortName}",
+                        color = Outline8C9387,
+                        fontSize = 12.sp,
+                        fontFamily = Manrope,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+                if (playerDetail.opponentTeam != null) {
+                    Spacer(modifier = Modifier.width(8.dp))
+                }
+                if (playerDetail.isLive) {
+                    Box(
+                        modifier = Modifier
+                            .size(6.dp)
+                            .background(TertiaryFFB3AD, CircleShape)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                }
+                Text(
+                    text = statusText,
+                    color = if (playerDetail.isLive) TertiaryFFB3AD else Outline8C9387,
+                    fontSize = 10.sp,
+                    fontFamily = Manrope,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+
+        Box(
+            modifier = Modifier
+                .size(48.dp)
+                .background(pointsCircleBg, CircleShape)
+                .then(
+                    if (!useGradient && !isSub)
+                        Modifier.border(1.dp, OutlineVariant42493E, CircleShape)
+                    else Modifier
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = "$displayPoints",
+                color = pointsFg,
+                fontSize = 18.sp,
+                fontFamily = SpaceGrotesk,
+                fontWeight = FontWeight.Bold
+            )
+        }
+
+        Spacer(modifier = Modifier.width(12.dp))
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Stitch Bench Card
+// ═══════════════════════════════════════════════════════════════════════════════
+
+@Composable
+private fun StitchBenchCard(
+    playerDetail: PlayerWithDetails,
+    modifier: Modifier = Modifier
+) {
     val points = playerDetail.liveStats?.stats?.totalPoints ?: playerDetail.player.eventPoints
-    val goals = playerDetail.liveStats?.stats?.goalsScored ?: 0
-    val assists = playerDetail.liveStats?.stats?.assists ?: 0
 
     Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.width(75.dp)
+        modifier = modifier
+            .background(SurfaceContainer20201F, RoundedCornerShape(8.dp))
+            .padding(8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
-            text = position,
-            fontSize = 10.sp,
+            text = playerDetail.team.shortName.take(3).uppercase(),
+            color = Outline8C9387,
+            fontSize = 8.sp,
+            fontFamily = Manrope,
             fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            letterSpacing = 0.5.sp
+        )
+        Spacer(modifier = Modifier.height(2.dp))
+        Text(
+            text = playerDetail.player.webName,
+            color = OnSurfaceE5E2E1,
+            fontSize = 10.sp,
+            fontFamily = SpaceGrotesk,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = TextAlign.Center
         )
         Spacer(modifier = Modifier.height(4.dp))
-        
-        Card(
+        val pillBg = when {
+            points >= 6 -> PrimaryContainer2D5A27
+            else -> SurfaceContainerHighest353535
+        }
+        val pillFg = when {
+            points >= 6 -> PrimaryA1D494
+            else -> OnSurfaceE5E2E1
+        }
+        Box(
             modifier = Modifier
-                .width(75.dp)
-                .height(100.dp)
-                .then(
-                    if (onPlayerClick != null) {
-                        Modifier.clickable { onPlayerClick(playerDetail) }
-                    } else Modifier
-                ),
-            shape = RoundedCornerShape(8.dp),
-            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceContainerHighest
+                .fillMaxWidth()
+                .background(pillBg, RoundedCornerShape(4.dp))
+                .padding(vertical = 3.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = if (points > 0) "$points pts" else "-",
+                color = pillFg,
+                fontSize = 9.sp,
+                fontFamily = SpaceGrotesk,
+                fontWeight = FontWeight.Bold
             )
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Transfers Detail Dialog
+// ═══════════════════════════════════════════════════════════════════════════════
+
+@Composable
+fun TransfersDetailDialog(
+    eventId: Int,
+    transfers: List<com.fpl.tracker.data.models.ManagerTransfer>,
+    transferCost: Int,
+    activeChip: String?,
+    bootstrapData: com.fpl.tracker.data.models.BootstrapData,
+    onDismiss: () -> Unit
+) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.4f))
+                .clickable(
+                    indication = null,
+                    interactionSource = remember { MutableInteractionSource() }
+                ) { onDismiss() },
+            contentAlignment = Alignment.Center
         ) {
             Column(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .padding(6.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.SpaceBetween
+                    .fillMaxWidth(0.92f)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(SurfaceContainerLow1C1B1B)
+                    .border(
+                        1.dp,
+                        OutlineVariant42493E.copy(alpha = 0.15f),
+                        RoundedCornerShape(12.dp)
+                    )
+                    .clickable(
+                        indication = null,
+                        interactionSource = remember { MutableInteractionSource() }
+                    ) {}
             ) {
-                // Team badge/color
-                Box(
+                // Header
+                Row(
                     modifier = Modifier
-                        .size(24.dp)
-                        .background(
-                            color = com.fpl.tracker.ui.components.getTeamColor(playerDetail.team.id),
-                            shape = CircleShape
+                        .fillMaxWidth()
+                        .background(SurfaceContainerHigh2A2A2A)
+                        .padding(horizontal = 20.dp, vertical = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("⇄", color = SecondaryFFE083, fontSize = 20.sp)
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Text(
+                            text = "GW$eventId TRANSFERS",
+                            color = OnSurfaceE5E2E1,
+                            fontSize = 18.sp,
+                            fontFamily = SpaceGrotesk,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 0.5.sp
                         )
-                )
-                
-                // Player name
-                Text(
-                    text = playerDetail.player.webName,
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    textAlign = TextAlign.Center
-                )
-                
-                // Points
-                Text(
-                    text = "$points pts",
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                
-                // Goals and Assists
-                if (goals > 0 || assists > 0) {
-                    Row(
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically
+                    }
+                    IconButton(
+                        onClick = onDismiss,
+                        modifier = Modifier
+                            .size(36.dp)
+                            .background(SurfaceContainerHighest353535, CircleShape)
                     ) {
-                        if (goals > 0) {
+                        Icon(
+                            Icons.Default.Close,
+                            contentDescription = "Close",
+                            tint = OnSurfaceVariantC2C9BB,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
+
+                // Content
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState())
+                        .padding(20.dp),
+                    verticalArrangement = Arrangement.spacedBy(20.dp)
+                ) {
+                    // Summary bar
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(SurfaceContainer20201F, RoundedCornerShape(8.dp))
+                            .drawLeftBorder(SecondaryFFE083, 4.dp)
+                            .padding(16.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column {
                             Text(
-                                text = "⚽$goals",
-                                fontSize = 9.sp
+                                text = "ACTIVE WILDCARD",
+                                color = OnSurfaceVariantC2C9BB,
+                                fontSize = 10.sp,
+                                fontFamily = Manrope,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 2.sp
+                            )
+                            Text(
+                                text = if (activeChip == "wildcard") "ACTIVE" else "INACTIVE",
+                                color = OnSurfaceE5E2E1,
+                                fontSize = 14.sp,
+                                fontFamily = SpaceGrotesk,
+                                fontWeight = FontWeight.Bold
                             )
                         }
-                        if (goals > 0 && assists > 0) {
-                            Text(text = " ", fontSize = 9.sp)
-                        }
-                        if (assists > 0) {
+                        Column(horizontalAlignment = Alignment.End) {
                             Text(
-                                text = "🅰️$assists",
-                                fontSize = 9.sp
+                                text = "COST",
+                                color = OnSurfaceVariantC2C9BB,
+                                fontSize = 10.sp,
+                                fontFamily = Manrope,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 2.sp
+                            )
+                            Text(
+                                text = if (transferCost > 0) "-$transferCost PTS" else "FREE",
+                                color = if (transferCost > 0) TertiaryFFB3AD else PrimaryA1D494,
+                                fontSize = 14.sp,
+                                fontFamily = SpaceGrotesk,
+                                fontWeight = FontWeight.Bold
                             )
                         }
                     }
-                }
-                
-                // Opponent team
-                playerDetail.opponentTeam?.let { opponent ->
-                    val isHome = playerDetail.fixture?.teamH == playerDetail.team.id
-                    Text(
-                        text = "${if (isHome) "vs" else "@"} ${opponent.shortName}",
-                        fontSize = 8.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
+
+                    // Transfer rows
+                    transfers.forEachIndexed { index, transfer ->
+                        val playerIn = bootstrapData.elements.find { it.id == transfer.elementIn }
+                        val playerOut = bootstrapData.elements.find { it.id == transfer.elementOut }
+                        val teamIn = playerIn?.let { p -> bootstrapData.teams.find { it.id == p.team } }
+                        val teamOut = playerOut?.let { p -> bootstrapData.teams.find { it.id == p.team } }
+
+                        val positionLabel = { type: Int ->
+                            when (type) {
+                                1 -> "GK"
+                                2 -> "DEF"
+                                3 -> "MID"
+                                4 -> "FWD"
+                                else -> ""
+                            }
+                        }
+
+                        Column {
+                            // Number divider
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "%02d".format(index + 1),
+                                    color = OnSurfaceVariantC2C9BB.copy(alpha = 0.4f),
+                                    fontSize = 12.sp,
+                                    fontFamily = SpaceGrotesk,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(1.dp)
+                                        .background(OutlineVariant42493E.copy(alpha = 0.2f))
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.height(10.dp))
+
+                            // OUT player
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(
+                                        Color(0xFF0E0E0E),
+                                        RoundedCornerShape(8.dp)
+                                    )
+                                    .drawLeftBorder(TertiaryFFB3AD, 2.dp)
+                                    .padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(32.dp)
+                                            .background(
+                                                SurfaceContainerHighest353535,
+                                                RoundedCornerShape(4.dp)
+                                            ),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            "OUT",
+                                            color = TertiaryFFB3AD,
+                                            fontSize = 9.sp,
+                                            fontFamily = SpaceGrotesk,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.width(10.dp))
+                                    Column {
+                                        Text(
+                                            text = (playerOut?.webName ?: "Unknown").uppercase(),
+                                            color = OnSurfaceE5E2E1,
+                                            fontSize = 14.sp,
+                                            fontFamily = SpaceGrotesk,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        Text(
+                                            text = "${teamOut?.shortName ?: "?"} \u2022 ${positionLabel(playerOut?.elementType ?: 0)}",
+                                            color = OnSurfaceVariantC2C9BB,
+                                            fontSize = 10.sp,
+                                            fontFamily = Manrope
+                                        )
+                                    }
+                                }
+                                Text(
+                                    text = "£${transfer.elementOutCost / 10.0}m",
+                                    color = OnSurfaceVariantC2C9BB,
+                                    fontSize = 14.sp,
+                                    fontFamily = SpaceGrotesk,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+
+                            // Arrow connector
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 2.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(28.dp)
+                                        .background(SurfaceContainerHigh2A2A2A, CircleShape)
+                                        .border(
+                                            1.dp,
+                                            OutlineVariant42493E.copy(alpha = 0.3f),
+                                            CircleShape
+                                        ),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        "↓",
+                                        color = SecondaryFFE083,
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+
+                            // IN player
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(
+                                        Color(0xFF0E0E0E),
+                                        RoundedCornerShape(8.dp)
+                                    )
+                                    .drawLeftBorder(PrimaryA1D494, 2.dp)
+                                    .padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(32.dp)
+                                            .background(
+                                                PrimaryContainer2D5A27.copy(alpha = 0.3f),
+                                                RoundedCornerShape(4.dp)
+                                            ),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            "IN",
+                                            color = PrimaryA1D494,
+                                            fontSize = 9.sp,
+                                            fontFamily = SpaceGrotesk,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.width(10.dp))
+                                    Column {
+                                        Text(
+                                            text = (playerIn?.webName ?: "Unknown").uppercase(),
+                                            color = OnSurfaceE5E2E1,
+                                            fontSize = 14.sp,
+                                            fontFamily = SpaceGrotesk,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        Text(
+                                            text = "${teamIn?.shortName ?: "?"} \u2022 ${positionLabel(playerIn?.elementType ?: 0)}",
+                                            color = OnSurfaceVariantC2C9BB,
+                                            fontSize = 10.sp,
+                                            fontFamily = Manrope
+                                        )
+                                    }
+                                }
+                                Text(
+                                    text = "£${transfer.elementInCost / 10.0}m",
+                                    color = OnSurfaceVariantC2C9BB,
+                                    fontSize = 14.sp,
+                                    fontFamily = SpaceGrotesk,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }
     }
 }
+
+private fun Modifier.drawLeftBorder(color: Color, width: androidx.compose.ui.unit.Dp): Modifier =
+    this.then(
+        Modifier.drawWithContent {
+            drawContent()
+            drawRect(
+                color = color,
+                topLeft = Offset.Zero,
+                size = Size(width.toPx(), size.height)
+            )
+        }
+    )
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Chips Card (preserved logic, Stitch styling)
+// ═══════════════════════════════════════════════════════════════════════════════
 
 private fun buildUsedChips(chips: List<com.fpl.tracker.data.models.ChipUsage>?): List<UsedChip> {
     if (chips.isNullOrEmpty()) return emptyList()
@@ -794,14 +1322,14 @@ private fun buildUsedChips(chips: List<com.fpl.tracker.data.models.ChipUsage>?):
 @Composable
 private fun ManagerChipsCard(
     usedChips: List<UsedChip>,
-    activeChip: String?
+    activeChip: String?,
+    modifier: Modifier = Modifier
 ) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainer
-        )
+        colors = CardDefaults.cardColors(containerColor = SurfaceContainerLow1C1B1B),
+        shape = RoundedCornerShape(16.dp)
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
@@ -815,18 +1343,17 @@ private fun ManagerChipsCard(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = "Chips Played",
-                        color = MaterialTheme.colorScheme.onSurface,
+                        color = OnSurfaceE5E2E1,
                         fontSize = 16.sp,
+                        fontFamily = SpaceGrotesk,
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        text = if (usedChips.isEmpty()) {
-                            "No chips used yet"
-                        } else {
-                            "${usedChips.size} chip${if (usedChips.size == 1) "" else "s"} this season"
-                        },
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontSize = 12.sp
+                        text = if (usedChips.isEmpty()) "No chips used yet"
+                        else "${usedChips.size} chip${if (usedChips.size == 1) "" else "s"} this season",
+                        color = Outline8C9387,
+                        fontSize = 12.sp,
+                        fontFamily = Manrope
                     )
                 }
                 activeChip?.let { chip ->
@@ -841,6 +1368,7 @@ private fun ManagerChipsCard(
                             text = "Active $label",
                             color = chipTextColor(chip),
                             fontSize = 11.sp,
+                            fontFamily = SpaceGrotesk,
                             fontWeight = FontWeight.ExtraBold
                         )
                     }
@@ -850,8 +1378,9 @@ private fun ManagerChipsCard(
             if (usedChips.isEmpty()) {
                 Text(
                     text = "This manager has not activated any chips so far.",
-                    color = Color(0xFF8C8CA1),
+                    color = Outline8C9387,
                     fontSize = 12.sp,
+                    fontFamily = Manrope,
                     fontStyle = FontStyle.Italic
                 )
             } else {
@@ -885,113 +1414,45 @@ private fun ManagerChipHistoryBadge(chip: UsedChip) {
                 text = label,
                 color = textColor,
                 fontSize = 11.sp,
+                fontFamily = SpaceGrotesk,
                 fontWeight = FontWeight.ExtraBold,
                 letterSpacing = 0.3.sp
             )
         }
         Text(
             text = "GW${chip.event}",
-            color = Color(0xFF8C8CA1),
+            color = Outline8C9387,
             fontSize = 10.sp,
+            fontFamily = Manrope,
             fontWeight = FontWeight.Medium
         )
     }
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// Legacy composables kept for backward compatibility
+// ═══════════════════════════════════════════════════════════════════════════════
+
 @Composable
-fun PlayerCard(playerDetail: PlayerWithDetails) {
-    val points = playerDetail.liveStats?.stats?.totalPoints ?: playerDetail.player.eventPoints
-    val isCaptain = playerDetail.pick.isCaptain
-    val isViceCaptain = playerDetail.pick.isViceCaptain
-    
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Player Info
-            Column(
-                modifier = Modifier.weight(1f)
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    if (isCaptain) {
-                        Box(
-                            modifier = Modifier
-                                .size(24.dp)
-                                .background(Color(0xFF00FF87), CircleShape),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                "C",
-                                color = Color.White,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    } else if (isViceCaptain) {
-                        Box(
-                            modifier = Modifier
-                                .size(24.dp)
-                                .background(MaterialTheme.colorScheme.onSurfaceVariant, CircleShape),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                "V",
-                                color = Color.White,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
-                    
-                    Column {
-                        Text(
-                            text = playerDetail.player.webName,
-                            style = MaterialTheme.typography.bodyLarge,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                        Text(
-                            text = playerDetail.team.shortName,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-            }
-            
-            // Points
-            Box(
-                modifier = Modifier
-                    .size(48.dp)
-                    .background(
-                        color = when {
-                            points > 5 -> MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)
-                            points < 2 -> MaterialTheme.colorScheme.error.copy(alpha = 0.3f)
-                            else -> MaterialTheme.colorScheme.surfaceVariant
-                        },
-                        shape = CircleShape
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "${points * playerDetail.pick.multiplier}",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center
-                )
-            }
-        }
+fun StatItem(
+    label: String,
+    value: String,
+    highlighted: Boolean = false
+) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodySmall,
+            color = if (highlighted) OnSurfaceVariantC2C9BB.copy(alpha = 0.85f)
+            else OnSurfaceVariantC2C9BB.copy(alpha = 0.6f)
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = value,
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.Bold,
+            color = if (highlighted) PrimaryA1D494 else OnSurfaceE5E2E1
+        )
     }
 }
 
@@ -1001,181 +1462,19 @@ fun PlayerListRow(
     provisionalBonus: Map<Int, Int> = emptyMap(),
     onPlayerClick: ((PlayerWithDetails) -> Unit)? = null
 ) {
-    val isCaptain = playerDetail.pick.isCaptain
-    val isViceCaptain = playerDetail.pick.isViceCaptain
+    StitchPlayerListRow(playerDetail, provisionalBonus, onPlayerClick)
+}
 
-    var points = if (playerDetail.hasLivePoints && playerDetail.liveStats != null) {
-        playerDetail.liveStats.stats.totalPoints
-    } else {
-        playerDetail.player.eventPoints
-    }
-    if (playerDetail.hasLivePoints && playerDetail.liveStats != null) {
-        val currentBonus = playerDetail.liveStats.stats.bonus
-        val provisionalBonusPoints = provisionalBonus[playerDetail.player.id] ?: 0
-        if (currentBonus == 0 && provisionalBonusPoints > 0) {
-            points += provisionalBonusPoints
-        }
-    }
-    val displayPoints = points * playerDetail.pick.multiplier
+@Composable
+fun BenchPlayerCard(
+    playerDetail: PlayerWithDetails,
+    position: String,
+    onPlayerClick: ((PlayerWithDetails) -> Unit)? = null
+) {
+    StitchBenchCard(playerDetail)
+}
 
-    val isHome = playerDetail.fixture?.teamH == playerDetail.team.id
-    val difficulty = playerDetail.fixture?.let {
-        if (isHome) it.teamHDifficulty else it.teamADifficulty
-    } ?: 3
-
-    // Difficulty colours from the requested palette
-    val diffColor = when (difficulty) {
-        1 -> Color(0xFF257D5A)  // dark green
-        2 -> Color(0xFF00FF87)  // bright green
-        3 -> Color(0xFFE7E7E7)  // light grey/white
-        4 -> Color(0xFFFF4455)  // red/pink
-        5 -> Color(0xFF80072D)  // dark maroon
-        else -> MaterialTheme.colorScheme.onSurfaceVariant
-    }
-
-    // Status label
-    val fixture = playerDetail.fixture
-    val statusText: String
-    val statusColor: Color
-    when {
-        fixture == null -> {
-            statusText = "No fix"
-            statusColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-        }
-        fixture.finished -> {
-            statusText = "Done"
-            statusColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
-        }
-        fixture.started == true -> {
-            statusText = "${fixture.minutes}'"
-            statusColor = MaterialTheme.colorScheme.primary
-        }
-        fixture.kickoffTime != null -> {
-            // Parse kickoff time to show e.g. "Sat 15:00"
-            val kTime = try {
-                val instant = java.time.Instant.parse(fixture.kickoffTime)
-                val zdt = instant.atZone(java.time.ZoneId.systemDefault())
-                val dayAbbrev = zdt.dayOfWeek.getDisplayName(java.time.format.TextStyle.SHORT, java.util.Locale.getDefault())
-                val time = "%02d:%02d".format(zdt.hour, zdt.minute)
-                "$dayAbbrev $time"
-            } catch (e: Exception) {
-                fixture.kickoffTime.take(10)
-            }
-            statusText = kTime
-            statusColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
-        }
-        else -> {
-            statusText = "TBC"
-            statusColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-        }
-    }
-
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .then(if (onPlayerClick != null) Modifier.clickable { onPlayerClick(playerDetail) } else Modifier),
-        shape = RoundedCornerShape(8.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // ── Player name + C/V badge ──────────────────────────────────
-            Row(
-                modifier = Modifier.weight(1f),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = playerDetail.player.webName,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                if (isCaptain || isViceCaptain) {
-                    Spacer(modifier = Modifier.width(5.dp))
-                    Box(
-                        modifier = Modifier
-                            .size(17.dp)
-                            .background(
-                                if (isCaptain) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                CircleShape
-                            ),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = if (isCaptain) "C" else "V",
-                            color = Color.White,
-                            fontSize = 9.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
-                if (playerDetail.isLive) {
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(text = "🔴", fontSize = 10.sp)
-                }
-            }
-
-            // ── Opponent chip: "ARS H" with diff colour ──────────────────
-            playerDetail.opponentTeam?.let { opponent ->
-                val oppShort = opponent.shortName.take(3).uppercase()
-                val venueLabel = if (isHome) "H" else "A"
-                val textColor = if (difficulty == 3) Color(0xFF111111) else Color.White
-                Box(
-                    modifier = Modifier
-                        .background(diffColor, RoundedCornerShape(6.dp))
-                        .padding(horizontal = 7.dp, vertical = 3.dp)
-                ) {
-                    Text(
-                        text = "$oppShort $venueLabel",
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = textColor
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.width(10.dp))
-
-            // ── Status ───────────────────────────────────────────────────
-            Text(
-                text = statusText,
-                fontSize = 12.sp,
-                color = statusColor,
-                fontWeight = if (fixture?.started == true && fixture.finished.not() && fixture.finishedProvisional.not()) FontWeight.Bold else FontWeight.Normal,
-                modifier = Modifier.width(56.dp),
-                textAlign = TextAlign.Center
-            )
-
-            Spacer(modifier = Modifier.width(8.dp))
-
-            // ── Points badge ─────────────────────────────────────────────
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .background(
-                        color = when {
-                            displayPoints >= 10 -> MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
-                            displayPoints >= 6  -> MaterialTheme.colorScheme.secondary.copy(alpha = 0.2f)
-                            displayPoints <= 2  -> MaterialTheme.colorScheme.error.copy(alpha = 0.2f)
-                            else -> MaterialTheme.colorScheme.surfaceVariant
-                        },
-                        shape = CircleShape
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "$displayPoints",
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center
-                )
-            }
-        }
-    }
+@Composable
+fun PlayerCard(playerDetail: PlayerWithDetails) {
+    StitchPlayerListRow(playerDetail)
 }

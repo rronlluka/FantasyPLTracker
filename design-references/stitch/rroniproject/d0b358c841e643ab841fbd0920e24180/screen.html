@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>The Pitch-Side Gallery | Live Squad Profile</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&amp;family=Manrope:wght@200;300;400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "surface-container-highest": "#353535",
+                        "surface": "#131313",
+                        "on-secondary": "#3c2f00",
+                        "on-primary-fixed-variant": "#23501e",
+                        "inverse-primary": "#3b6934",
+                        "surface-container": "#20201f",
+                        "on-error": "#690005",
+                        "on-surface-variant": "#c2c9bb",
+                        "on-tertiary-container": "#ffaea7",
+                        "surface-container-low": "#1c1b1b",
+                        "primary-fixed-dim": "#a1d494",
+                        "inverse-on-surface": "#313030",
+                        "on-primary-container": "#9dd090",
+                        "primary-fixed": "#bcf0ae",
+                        "on-secondary-container": "#645000",
+                        "on-tertiary": "#68000a",
+                        "error-container": "#93000a",
+                        "outline-variant": "#42493e",
+                        "on-primary": "#0a3909",
+                        "tertiary-fixed": "#ffdad7",
+                        "background": "#131313",
+                        "surface-container-high": "#2a2a2a",
+                        "on-secondary-fixed-variant": "#574500",
+                        "on-error-container": "#ffdad6",
+                        "surface-container-lowest": "#0e0e0e",
+                        "on-background": "#e5e2e1",
+                        "secondary": "#ffe083",
+                        "tertiary-container": "#a40217",
+                        "inverse-surface": "#e5e2e1",
+                        "tertiary": "#ffb3ad",
+                        "surface-bright": "#393939",
+                        "outline": "#8c9387",
+                        "error": "#ffb4ab",
+                        "secondary-fixed": "#ffe083",
+                        "surface-tint": "#a1d494",
+                        "on-tertiary-fixed": "#410004",
+                        "primary-container": "#2d5a27",
+                        "on-surface": "#e5e2e1",
+                        "on-tertiary-fixed-variant": "#930013",
+                        "on-primary-fixed": "#002201",
+                        "secondary-container": "#eec200",
+                        "primary": "#a1d494",
+                        "tertiary-fixed-dim": "#ffb3ad",
+                        "secondary-fixed-dim": "#eec200",
+                        "on-secondary-fixed": "#231b00",
+                        "surface-dim": "#131313",
+                        "surface-variant": "#353535"
+                    },
+                    fontFamily: {
+                        "headline": ["Space Grotesk"],
+                        "body": ["Manrope"],
+                        "label": ["Manrope"]
+                    },
+                    borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        body {
+            background-color: #131313;
+            color: #e5e2e1;
+            font-family: 'Manrope', sans-serif;
+        }
+        .pitch-gradient {
+            background: linear-gradient(135deg, #a1d494 0%, #2d5a27 100%);
+        }
+        .glass-panel {
+            backdrop-filter: blur(16px);
+            background: rgba(53, 53, 53, 0.4);
+        }
+    </style>
+<style>
+        body {
+            min-height: max(884px, 100dvh);
+        }
+    </style>
+</head>
+<body class="bg-surface text-on-surface antialiased pb-32 selection:bg-primary selection:text-on-primary">
+<!-- Top Navigation (Identical to Pitch View) -->
+<header class="bg-[#131313] dark:bg-[#131313] shadow-[0_24px_24px_rgba(0,0,0,0.06)] sticky top-0 z-50">
+<div class="flex items-center justify-between w-full px-6 py-4">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-full bg-surface-container overflow-hidden border border-outline-variant/20">
+<img alt="Manager Profile Avatar" class="w-full h-full object-cover" data-alt="Stylized portrait of a sports manager avatar" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC6ptimOrzjWzFTp2mMiFI7IXVEuPPYCiiy33LQuJLflpuXIPg835PQnjRCy19zMiqImadp2zPxVKNOT5tL66jEVuYW7walufZqQ6I4sifkuoL_ziF0A5g_nbukNBoc4HE_QzakzuCtKpNX77J4wXVsr1Xit1XMpixmkMYeijGs7lXwkJ-qtQtsoNOmIQ3S4C6gAsfOQin6HmA79f2yKka21VMgjtFmoNNMqB3SNxT08E_haNJfZDhYx4Irn65R3CvSje6JbJeSCJFn"/>
+</div>
+<h1 class="text-2xl font-headline font-bold tracking-tighter text-[#a1d494] uppercase">The Pitch-Side Gallery</h1>
+</div>
+<button class="active:scale-95 transition-transform text-[#a1d494]">
+<span class="material-symbols-outlined text-2xl">settings</span>
+</button>
+</div>
+</header>
+<main class="max-w-3xl mx-auto px-0">
+<!-- Dashboard Header (Identical to Pitch View) -->
+<section class="px-6 pt-8 pb-4">
+<div class="flex justify-between items-end mb-6">
+<div>
+<span class="font-headline font-bold text-primary uppercase tracking-widest text-sm">Gameweek 31</span>
+<h2 class="text-5xl font-headline font-extrabold tracking-tighter text-on-surface">Bando</h2>
+</div>
+<div class="text-right">
+<div class="bg-tertiary-container px-3 py-1 rounded-full inline-flex items-center gap-2 mb-2 animate-pulse">
+<span class="w-2 h-2 rounded-full bg-white"></span>
+<span class="text-[10px] font-bold uppercase tracking-tighter text-white">Live</span>
+</div>
+</div>
+</div>
+<div class="grid grid-cols-2 gap-4">
+<div class="bg-surface-container-low p-6 rounded-xl border border-outline-variant/10 relative overflow-hidden group">
+<div class="absolute -right-4 -top-4 opacity-10 group-hover:scale-110 transition-transform duration-700">
+<span class="material-symbols-outlined text-8xl" style="font-variation-settings: 'wght' 700;">sports_soccer</span>
+</div>
+<p class="text-[10px] uppercase font-bold text-outline tracking-[0.2em] mb-1">GW Points</p>
+<p class="text-6xl font-headline font-black text-primary">18</p>
+</div>
+<div class="bg-surface-container-low p-6 rounded-xl border border-outline-variant/10 relative overflow-hidden group">
+<div class="absolute -right-4 -top-4 opacity-10 group-hover:scale-110 transition-transform duration-700">
+<span class="material-symbols-outlined text-8xl" style="font-variation-settings: 'wght' 700;">leaderboard</span>
+</div>
+<p class="text-[10px] uppercase font-bold text-outline tracking-[0.2em] mb-1">Total Score</p>
+<p class="text-6xl font-headline font-black text-secondary">1802</p>
+</div>
+</div>
+</section>
+<!-- Aesthetic View Toggle (Identical to Pitch View but switched) -->
+<div class="px-6 mb-8">
+<div class="bg-surface-container-highest p-1 rounded-xl flex items-center max-w-[240px]">
+<button class="flex-1 py-2 px-4 rounded-lg text-sm font-bold text-outline hover:text-on-surface transition-all">
+                Pitch
+            </button>
+<button class="flex-1 py-2 px-4 rounded-lg text-sm font-bold bg-primary text-on-primary shadow-lg transition-all">
+                List
+            </button>
+</div>
+</div>
+<!-- Squad List Area -->
+<div class="px-4 flex flex-col gap-3">
+<!-- Table Header -->
+<div class="px-4 py-2 flex items-center justify-between text-outline text-[10px] uppercase tracking-widest font-bold">
+<span>Player / Fixture</span>
+<span>Points</span>
+</div>
+<!-- Player Item 1 -->
+<div class="group bg-surface-container-low hover:bg-surface-container-high transition-all duration-300 rounded-xl p-4 flex items-center gap-4 relative overflow-hidden">
+<div class="absolute left-0 top-0 bottom-0 w-1 bg-primary-container"></div>
+<div class="h-14 w-14 rounded-lg bg-surface-container-highest overflow-hidden relative">
+<img alt="Player Headshot" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAKLUoh82tNKoo4Vbo4XrokPRT-36t3_TET-BwXNujGNWIX75GETrUmt6HbfrzVPYPBDfv9QOHndQpXIYcDw9NtLTwgU0OdfR5-B1Q1wVH8xCB7KnX1gQp5UJzyMTPlmPtXfnzvP_5TmdX079U_my6FSRtrOjBTRGk_d_dSmXxLN19EHc77BVkocRC8nI06m-qp8xQX7aHdgAHQ3k9RchRWBAW8aPmuVuMaZaeavS2W98kdMvIE7g9aAfXoxQTAuQBZ6UE3RtW8nmhX"/>
+</div>
+<div class="flex-1">
+<div class="flex items-center gap-2 mb-1">
+<span class="font-headline text-lg font-bold">Pope</span>
+<span class="px-2 py-0.5 rounded bg-surface-variant font-label text-[10px] uppercase font-black text-on-surface-variant">GK</span>
+</div>
+<div class="flex items-center gap-3">
+<span class="font-label text-xs text-outline font-semibold">NEW vs WHU</span>
+<div class="flex items-center gap-1">
+<span class="h-1.5 w-1.5 rounded-full bg-tertiary animate-pulse"></span>
+<span class="font-label text-[10px] text-tertiary font-bold uppercase tracking-tighter">Live 84'</span>
+</div>
+</div>
+</div>
+<div class="h-12 w-12 rounded-full pitch-gradient flex items-center justify-center shadow-lg active:scale-90 transition-transform cursor-pointer">
+<span class="font-headline text-xl font-bold text-on-primary">6</span>
+</div>
+</div>
+<!-- Player Item 2 -->
+<div class="group bg-surface-container-low hover:bg-surface-container-high transition-all duration-300 rounded-xl p-4 flex items-center gap-4 relative overflow-hidden">
+<div class="absolute left-0 top-0 bottom-0 w-1 bg-primary"></div>
+<div class="h-14 w-14 rounded-lg bg-surface-container-highest overflow-hidden relative">
+<img alt="Player Headshot" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDP-bfMkoII9lZJMnqVH19jK7Xi4hWC4Kj-ZHLHlkoFJZXXmtvkZYvQa6NuReB7mDHqD_8RcPQtm7fCk2fabyzGVv0fVKJCsEciJM3n7K6X18IG1PjHTnaBaFTXxPks4e7wIOjJe3Krep78snKSl4E0_cNSmlKTe7OioH9LfAh_XdsCXKgx9ILsOtaStWz_gt9UK6LCZqrzFjL5JGRUWTdGAOOfXgulriTbTlYy6O4VhG5T40NONSOCkmRKrr_bZfGTPXRlBhgbEMgM"/>
+</div>
+<div class="flex-1">
+<div class="flex items-center gap-2 mb-1">
+<span class="font-headline text-lg font-bold uppercase tracking-tight">Trippier</span>
+<span class="px-2 py-0.5 rounded bg-surface-variant font-label text-[10px] uppercase font-black text-on-surface-variant">DEF</span>
+</div>
+<div class="flex items-center gap-3 text-outline">
+<span class="font-label text-xs font-semibold">NEW vs WHU</span>
+<span class="font-label text-[10px] font-bold uppercase tracking-tighter">Live 84'</span>
+</div>
+</div>
+<div class="h-12 w-12 rounded-full bg-surface-container-highest border border-outline-variant flex items-center justify-center shadow-inner">
+<span class="font-headline text-xl font-bold text-on-surface">12</span>
+</div>
+</div>
+<!-- Player Item 3 -->
+<div class="group bg-surface-container-low hover:bg-surface-container-high transition-all duration-300 rounded-xl p-4 flex items-center gap-4 relative overflow-hidden">
+<div class="absolute left-0 top-0 bottom-0 w-1 bg-secondary"></div>
+<div class="h-14 w-14 rounded-lg bg-surface-container-highest overflow-hidden relative">
+<img alt="Player Headshot" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCiUAVnpjK9yHPfhf_p2c1Mb0u5O-i87sQsnHB911tiA-K0rj4ocecoUstrP0tfNlKLd1aWnrGSBHsV_q3UXLWO8oaYKD8-FEha9tgJhiB9knYyy7NQ0rDTWKEW_mZIVSuy5xzXkfjfalIgIcbB1a02JKTaun-sFPM3v8JBDpfihnqsXZwBqVHxkje_fFzb9aQZ5cGahvsQpuYJDu8Ao0hY3vcf8kbSMtCfzx-O4Il_9WiPQlUZZK4rrnVwxJNnBCote__qLsbwMm2N"/>
+</div>
+<div class="flex-1">
+<div class="flex items-center gap-2 mb-1">
+<span class="font-headline text-lg font-bold">Salah</span>
+<span class="px-2 py-0.5 rounded bg-secondary text-on-secondary font-label text-[10px] uppercase font-black">MID (C)</span>
+</div>
+<div class="flex items-center gap-3">
+<span class="font-label text-xs text-outline font-semibold">LIV vs EVE</span>
+<span class="font-label text-[10px] text-outline font-bold uppercase tracking-tighter">Mon 20:00</span>
+</div>
+</div>
+<div class="h-12 w-12 rounded-full bg-surface-container-highest border border-outline-variant flex items-center justify-center">
+<span class="font-headline text-xl font-bold text-outline">0</span>
+</div>
+</div>
+<!-- Player Item 4 -->
+<div class="group bg-surface-container-low hover:bg-surface-container-high transition-all duration-300 rounded-xl p-4 flex items-center gap-4 relative overflow-hidden">
+<div class="absolute left-0 top-0 bottom-0 w-1 bg-surface-container-highest"></div>
+<div class="h-14 w-14 rounded-lg bg-surface-container-highest overflow-hidden relative">
+<img alt="Player Headshot" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCqkE2iuDR_6lTBbdfmQ_2wK4VZrBDNV4kfQ7cX04mBCK85qtc6iIUydaLPZG3l8Tx_YyMqQBPeE67LlYHUFiECQ_YJ19sK6G3D0YwRMqaACwh6ztYF-yK7vfhyus5pBSHFgATo5A_ycFHn0vLyPK4nWl6Cs13-eU7OwlexZGA8G28zW2mZm1pwyhPm96WwYofohUwtLp2rJi34lM-zsuwAiAlyHOGp09wIW20pSN3470x0igEkr9BMVH98A1Gi_Xb61AFnRWwwksuI"/>
+</div>
+<div class="flex-1">
+<div class="flex items-center gap-2 mb-1">
+<span class="font-headline text-lg font-bold">Haaland</span>
+<span class="px-2 py-0.5 rounded bg-surface-variant font-label text-[10px] uppercase font-black text-on-surface-variant">FWD</span>
+</div>
+<div class="flex items-center gap-3 text-outline">
+<span class="font-label text-xs font-semibold">MCI vs AVL</span>
+<span class="font-label text-[10px] font-bold uppercase tracking-tighter">Sat 15:00</span>
+</div>
+</div>
+<div class="h-12 w-12 rounded-full bg-surface-container-highest border border-outline-variant flex items-center justify-center">
+<span class="font-headline text-xl font-bold text-on-surface">2</span>
+</div>
+</div>
+<!-- Player Item 5 -->
+<div class="group bg-surface-container-low hover:bg-surface-container-high transition-all duration-300 rounded-xl p-4 flex items-center gap-4 relative overflow-hidden">
+<div class="absolute left-0 top-0 bottom-0 w-1 bg-primary-container"></div>
+<div class="h-14 w-14 rounded-lg bg-surface-container-highest overflow-hidden relative">
+<img alt="Player Headshot" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAbP-p_S7sbZeBgceM6dYnTIJ2C7w6I6r_LBVfawTZ7wF-vaAtQNqJfiaaakLsAOJIL7TJYCrrKUpUvkdvZfiVa8ThMP1KWFQDo6XP5Kp8_rIavEYvsI_5QYCuNcUYtO8su-N1j9uUegJPE4vbnY3fyKV6lvLinnetHlxVt3lmt7QpB6ymDK5J1c1WaOChPHORmmSYQUmh3nkhYGQC1BpHK7AmfTFPk6xWjsB9YrmEfauVhQ2tM1O6vpKoHAVnr4J9Bq3kfWsKcYlqr"/>
+</div>
+<div class="flex-1">
+<div class="flex items-center gap-2 mb-1">
+<span class="font-headline text-lg font-bold uppercase">Ødegaard</span>
+<span class="px-2 py-0.5 rounded bg-surface-variant font-label text-[10px] uppercase font-black text-on-surface-variant">MID</span>
+</div>
+<div class="flex items-center gap-3">
+<span class="font-label text-xs text-outline font-semibold">ARS vs BRE</span>
+<div class="flex items-center gap-1">
+<span class="font-label text-[10px] text-outline font-bold uppercase tracking-tighter">FT</span>
+</div>
+</div>
+</div>
+<div class="h-12 w-12 rounded-full pitch-gradient flex items-center justify-center shadow-lg active:scale-95 transition-transform cursor-pointer">
+<span class="font-headline text-xl font-bold text-on-primary">15</span>
+</div>
+</div>
+<!-- Player Item 6 (Sub) -->
+<div class="group bg-surface-container-low hover:bg-surface-container-high transition-all duration-300 rounded-xl p-4 flex items-center gap-4 relative overflow-hidden opacity-80">
+<div class="absolute left-0 top-0 bottom-0 w-1 bg-outline-variant"></div>
+<div class="h-14 w-14 rounded-lg bg-surface-container-highest overflow-hidden relative grayscale">
+<img alt="Player Headshot" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBRTdRe73FXLu4oZiCD_vRh4godMUhp65DLFqxNRGyPEI1LwlsTtDXFSaeXEXEgx4EgVvaGHfPytsDDUJ7X6Ov96ij72Ah-aWCkemUrg7IfRDzaj3C4ExeqP8TtVRobHcjS8VOa_6TsEfQ9XB6DXYPrBAZsGpVhwk5D486Bx-P8pp5QhvAJAPNmpfK0oCixbt9jVwgjSeeaxZx2NNa_kXUaE-WCxXpdSXN99cluGz15vUeG9rBKsxYt89Xxfl2D3jKpcW3LA_K0YE6k"/>
+</div>
+<div class="flex-1">
+<div class="flex items-center gap-2 mb-1">
+<span class="font-headline text-lg font-bold">White</span>
+<span class="px-2 py-0.5 rounded bg-outline-variant font-label text-[10px] uppercase font-black text-surface">SUB</span>
+</div>
+<div class="flex items-center gap-3">
+<span class="font-label text-xs text-outline font-semibold">ARS vs BRE</span>
+<span class="font-label text-[10px] text-outline font-bold uppercase tracking-tighter">FT</span>
+</div>
+</div>
+<div class="h-12 w-12 rounded-full bg-surface-container border border-outline-variant/30 flex items-center justify-center">
+<span class="font-headline text-xl font-bold text-outline">1</span>
+</div>
+</div>
+<!-- Average Points Section (Integrated into List View) -->
+<div class="mt-4 bg-surface-container-high rounded-2xl p-6 flex items-center justify-between border border-outline-variant/10 shadow-lg">
+<div class="flex items-center gap-4">
+<div class="h-12 w-12 rounded-xl bg-tertiary-container flex items-center justify-center">
+<span class="material-symbols-outlined text-on-tertiary-container" style="font-variation-settings: 'FILL' 1;">query_stats</span>
+</div>
+<div>
+<h4 class="font-headline text-lg font-bold uppercase tracking-tight">Average Points</h4>
+<p class="font-label text-xs text-outline">League average this week</p>
+</div>
+</div>
+<div class="text-right">
+<span class="font-headline text-3xl font-bold">42</span>
+</div>
+</div>
+</div>
+</main>
+<!-- Bottom Navigation Anchor -->
+<nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center pb-safe pt-2 px-4 bg-[#131313]/90 backdrop-blur-xl border-t border-[#353535]/15 shadow-[0_-8px_24px_rgba(0,0,0,0.2)] rounded-t-[1.5rem]">
+<a class="flex flex-col items-center justify-center text-[#353535] px-4 py-2 hover:text-[#ffe083] active:scale-90 transition-all" href="#">
+<span class="material-symbols-outlined">sports_soccer</span>
+<span class="font-['Manrope'] text-[10px] font-semibold uppercase tracking-widest mt-1">Pitch</span>
+</a>
+<a class="flex flex-col items-center justify-center text-[#353535] px-4 py-2 hover:text-[#ffe083] active:scale-90 transition-all" href="#">
+<span class="material-symbols-outlined">leaderboard</span>
+<span class="font-['Manrope'] text-[10px] font-semibold uppercase tracking-widest mt-1">Leagues</span>
+</a>
+<a class="flex flex-col items-center justify-center text-[#353535] px-4 py-2 hover:text-[#ffe083] active:scale-90 transition-all" href="#">
+<span class="material-symbols-outlined">swap_horizontal_circle</span>
+<span class="font-['Manrope'] text-[10px] font-semibold uppercase tracking-widest mt-1">Transfers</span>
+</a>
+<a class="flex flex-col items-center justify-center bg-[#2d5a27] text-[#a1d494] rounded-xl px-4 py-2 active:scale-90 transition-all" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">query_stats</span>
+<span class="font-['Manrope'] text-[10px] font-semibold uppercase tracking-widest mt-1">Status</span>
+</a>
+</nav>
+</body></html>
