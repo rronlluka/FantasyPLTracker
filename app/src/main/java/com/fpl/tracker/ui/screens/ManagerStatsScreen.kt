@@ -352,12 +352,7 @@ fun ManagerStatsScreen(
                                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                                 ) {
                                     rowChips.forEach { chipDef ->
-                                        val usages = chips.filter { it.name == chipDef.identifier }
-                                            .sortedBy { it.event }
-                                        
-                                        val usage = if (chipDef.instance > 0 && usages.size >= chipDef.instance) usages[chipDef.instance - 1]
-                                                    else if (chipDef.instance == 0) usages.firstOrNull()
-                                                    else null
+                                        val usage = resolveChipUsage(chipDef, chips)
 
                                         ChipCard(
                                             modifier = Modifier.weight(1f),
@@ -379,40 +374,40 @@ fun ManagerStatsScreen(
                     // ── 3. Transfers ─────────────────────────────────────────
                     if (transfers.isNotEmpty()) {
                         item {
-                            Row(
-                                modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                ProfileSectionHeader("Market Activity", "/ Recent Transfers", modifier = Modifier.weight(1f).padding(horizontal = 0.dp))
-                                // Live badge
-                                Box(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(4.dp))
-                                        .background(StitchPrimary.copy(alpha = 0.2f))
-                                        .padding(horizontal = 8.dp, vertical = 4.dp)
-                                ) {
-                                    Text("LIVE GW$currentEvent", color = StitchPrimary, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                                }
-                            }
+                            ProfileSectionHeader("Transfers Activity", null)
                         }
-                        // Limit to last 5 GWs
-                        val recentTransfers = transfers
+                        
+                        // Flatten and limit to last 10 transfers
+                        val flattenedTransfers = transfers
+                            .flatMap { entry -> 
+                                entry.value.mapIndexed { index, transfer -> Triple(entry.key, transfer, index) } 
+                            }
+                            .take(10)
+
                         items(
-                            items = recentTransfers,
-                            key = { entry: Map.Entry<Int, List<ManagerTransfer>> -> entry.key }
-                        ) { entry: Map.Entry<Int, List<ManagerTransfer>> ->
-                            val gw = entry.key
-                            val gwTransfers = entry.value
+                            items = flattenedTransfers,
+                            key = { triple -> "${triple.first}_${triple.second.elementIn}_${triple.second.elementOut}" }
+                        ) { triple: Triple<Int, com.fpl.tracker.data.models.ManagerTransfer, Int> ->
+                            val (gw, transfer, index) = triple
                             val gwCost = managerHistory?.current?.find { it.event == gw }?.eventTransfersCost ?: 0
-                            val activeChip = chips.find { it.event == gw }?.name?.uppercase()
-                            TransferGwGroup(
+                            val transfersThisGw = transfers.firstOrNull { it.key == gw }?.value?.size ?: 0
+                            val paidTransfersCount = (gwCost / 4).coerceAtMost(transfersThisGw)
+                            val freeTransfersCount = (transfersThisGw - paidTransfersCount).coerceAtLeast(0)
+                            val isFree = index < freeTransfersCount
+                            
+                            val playerOut = players.find { it.id == transfer.elementOut }
+                            val playerIn  = players.find { it.id == transfer.elementIn }
+                            val teamOut   = teams.find { it.id == playerOut?.team }
+                            val teamIn    = teams.find { it.id == playerIn?.team }
+                            
+                            TransferActivityCard(
+                                transfer = transfer,
                                 gw = gw,
-                                gwTransfers = gwTransfers,
-                                gwCost = gwCost,
-                                players = players,
-                                teams = teams,
-                                activeChip = activeChip
+                                isFree = isFree,
+                                playerIn = playerIn,
+                                playerOut = playerOut,
+                                teamIn = teamIn,
+                                teamOut = teamOut
                             )
                         }
                         item {
@@ -426,14 +421,18 @@ fun ManagerStatsScreen(
                                     .fillMaxWidth()
                                     .padding(horizontal = 20.dp, vertical = 8.dp),
                                 shape = RoundedCornerShape(12.dp),
-                                border = BorderStroke(1.dp, StitchPrimary.copy(alpha = 0.2f)),
-                                colors = ButtonDefaults.outlinedButtonColors(containerColor = StitchSurfaceContainer)
+                                border = BorderStroke(1.dp, StitchOutlineVariant.copy(alpha = 0.1f)),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = StitchSurfaceHighest.copy(alpha = 0.3f),
+                                    contentColor = StitchOutline
+                                )
                             ) {
-                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
-                                    Text("VIEW FULL TRANSFER HISTORY", color = StitchPrimary, fontWeight = FontWeight.Black, fontSize = 14.sp)
-                                    Spacer(Modifier.width(12.dp))
-                                    Icon(Icons.Default.History, contentDescription = null, tint = StitchPrimary, modifier = Modifier.size(18.dp))
-                                }
+                                Text(
+                                    "VIEW FULL TRANSFER HISTORY", 
+                                    fontSize = 11.sp, 
+                                    fontWeight = FontWeight.Black,
+                                    letterSpacing = 1.sp
+                                )
                             }
                         }
                         item { Spacer(Modifier.height(8.dp)) }
@@ -442,28 +441,7 @@ fun ManagerStatsScreen(
 
                     // ── 4. GW History ─────────────────────────────────────────
                     if (gwHistory.isNotEmpty()) {
-                        item {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 20.dp, vertical = 12.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                ProfileSectionHeader(
-                                    title = "GW History",
-                                    subtitle = if (showAllGameweeks) "/ All Gameweeks" else "/ Last ${gwHistory.size} Gameweeks",
-                                    modifier = Modifier.weight(1f).padding(horizontal = 0.dp, vertical = 0.dp)
-                                )
-                                TextButton(onClick = { showAllGameweeks = !showAllGameweeks }) {
-                                    Text(
-                                        if (showAllGameweeks) "SHOW LESS" else "SHOW ALL",
-                                        color = StitchPrimary,
-                                        fontWeight = FontWeight.Black
-                                    )
-                                }
-                            }
-                        }
+                        item { ProfileSectionHeader("GW History", null) }
                         item {
                             Column(
                                 modifier = Modifier
@@ -494,6 +472,22 @@ fun ManagerStatsScreen(
                                 }
                             }
                             Spacer(Modifier.height(4.dp))
+                        }
+                        item {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 20.dp, vertical = 8.dp),
+                                horizontalArrangement = Arrangement.End
+                            ) {
+                                TextButton(onClick = { showAllGameweeks = !showAllGameweeks }) {
+                                    Text(
+                                        if (showAllGameweeks) "SHOW LESS" else "SHOW ALL",
+                                        color = StitchPrimary,
+                                        fontWeight = FontWeight.Black
+                                    )
+                                }
+                            }
                         }
                     }
 
@@ -683,8 +677,6 @@ fun TransferHistoryScreen(
 
             else -> {
                 val historyData = uiState.managerHistory
-                val chips = historyData?.chips ?: emptyList()
-                val chipDefs = orderedChipDefinitions(chips)
                 val transfersByGw = uiState.transfers
                     .groupBy { transfer: ManagerTransfer -> transfer.event }
                     .toSortedMap(compareByDescending { it })
@@ -695,38 +687,6 @@ fun TransferHistoryScreen(
                         .padding(padding),
                     contentPadding = PaddingValues(bottom = 24.dp)
                 ) {
-                    item {
-                        ProfileSectionHeader("Chips Timeline", "/ Played & Unused")
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 20.dp),
-                            verticalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            chipDefs.chunked(2).forEach { rowChips ->
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                                ) {
-                                    rowChips.forEach { chipDef ->
-                                        val usages = chips.filter { it.name == chipDef.identifier }.sortedBy { it.event }
-                                        val usage = usages.getOrNull(chipDef.instance - 1)
-                                        ChipCard(
-                                            modifier = Modifier.weight(1f),
-                                            label = chipDef.label,
-                                            gwLabel = usage?.let { "GW ${it.event}" } ?: "UNUSED",
-                                            icon = chipDef.icon,
-                                            iconTint = chipDef.color,
-                                            dimmed = usage == null,
-                                            isLocked = usage == null
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                        Spacer(Modifier.height(16.dp))
-                    }
-
                     item {
                         ProfileSectionHeader("All Transfer History", "/ Every Gameweek")
                     }
@@ -752,16 +712,59 @@ fun TransferHistoryScreen(
                             val gw = entry.key
                             val gwTransfers = entry.value
                             val gwCost = historyData?.current?.find { currentGw -> currentGw.event == gw }?.eventTransfersCost ?: 0
-                            val activeChip = chips.find { chip -> chip.event == gw }?.name?.uppercase()
+                            val paidTransfersCount = (gwCost / 4).coerceAtMost(gwTransfers.size)
+                            val freeTransfersCount = (gwTransfers.size - paidTransfersCount).coerceAtLeast(0)
 
-                            TransferGwGroup(
-                                gw = gw,
-                                gwTransfers = gwTransfers,
-                                gwCost = gwCost,
-                                players = uiState.bootstrapData?.elements ?: emptyList(),
-                                teams = uiState.bootstrapData?.teams ?: emptyList(),
-                                activeChip = activeChip
-                            )
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 6.dp, bottom = 12.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 20.dp, vertical = 8.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "GW $gw",
+                                        color = StitchOnSurface,
+                                        fontWeight = FontWeight.Black,
+                                        fontStyle = FontStyle.Italic,
+                                        fontSize = 18.sp
+                                    )
+                                    Text(
+                                        text = if (gwCost > 0) "TOTAL -${gwCost} PTS" else "TOTAL FREE",
+                                        color = if (gwCost > 0) StitchTertiary else StitchPrimary,
+                                        fontWeight = FontWeight.Black,
+                                        fontSize = 12.sp,
+                                        letterSpacing = 0.8.sp
+                                    )
+                                }
+                                HorizontalDivider(
+                                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp),
+                                    color = StitchOutlineVariant.copy(alpha = 0.25f)
+                                )
+
+                                gwTransfers.forEachIndexed { index, transfer ->
+                                    val isFree = index < freeTransfersCount
+                                    val playerOut = uiState.bootstrapData?.elements?.find { it.id == transfer.elementOut }
+                                    val playerIn = uiState.bootstrapData?.elements?.find { it.id == transfer.elementIn }
+                                    val teamOut = uiState.bootstrapData?.teams?.find { it.id == playerOut?.team }
+                                    val teamIn = uiState.bootstrapData?.teams?.find { it.id == playerIn?.team }
+
+                                    TransferActivityCard(
+                                        transfer = transfer,
+                                        gw = gw,
+                                        isFree = isFree,
+                                        playerIn = playerIn,
+                                        playerOut = playerOut,
+                                        teamIn = teamIn,
+                                        teamOut = teamOut
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -1030,6 +1033,121 @@ private fun ChipCard(
     }
 }
 
+
+
+@Composable
+private fun TransferActivityCard(
+    modifier: Modifier = Modifier,
+    transfer: ManagerTransfer,
+    gw: Int,
+    isFree: Boolean,
+    playerIn: com.fpl.tracker.data.models.Player?,
+    playerOut: com.fpl.tracker.data.models.Player?,
+    teamIn: com.fpl.tracker.data.models.Team?,
+    teamOut: com.fpl.tracker.data.models.Team?
+) {
+    val accentColor = if (isFree) StitchPrimary else StitchTertiary
+    
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = 6.dp)
+            .clip(RoundedCornerShape(22.dp))
+            .background(StitchSurfaceContainer)
+    ) {
+        Box(
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .width(8.dp)
+                .fillMaxHeight()
+                .padding(vertical = 6.dp)
+                .clip(RoundedCornerShape(topEnd = 22.dp, bottomEnd = 22.dp))
+                .background(accentColor)
+        )
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 22.dp, end = 20.dp, top = 20.dp, bottom = 20.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(18.dp)
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(
+                        Icons.Default.ArrowUpward,
+                        contentDescription = null,
+                        tint = StitchPrimary,
+                        modifier = Modifier.size(30.dp)
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    Icon(
+                        Icons.Default.ArrowDownward,
+                        contentDescription = null,
+                        tint = StitchTertiary,
+                        modifier = Modifier.size(30.dp)
+                    )
+                }
+
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = playerIn?.webName ?: "Unknown",
+                            fontSize = 24.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = StitchOnSurface
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            text = "IN",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Normal,
+                            color = StitchOutline
+                        )
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = playerOut?.webName ?: "Unknown",
+                            fontSize = 22.sp,
+                            fontWeight = FontWeight.Normal,
+                            color = StitchOutline
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            text = "OUT",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Normal,
+                            color = StitchOutline
+                        )
+                    }
+                }
+            }
+
+            Column(
+                horizontalAlignment = Alignment.End,
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    text = if (isFree) "FREE" else "-4 PTS",
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Black,
+                    color = if (isFree) StitchOnSurface else StitchTertiary,
+                    fontStyle = FontStyle.Italic
+                )
+                Text(
+                    text = "GW $gw",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = StitchOutline,
+                    letterSpacing = 0.8.sp
+                )
+            }
+        }
+    }
+}
 
 @Composable
 private fun TransferGwGroup(
