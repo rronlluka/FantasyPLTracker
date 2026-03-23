@@ -44,6 +44,7 @@ android {
 }
 
 dependencies {
+    implementation(project(":shared"))
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
@@ -72,6 +73,10 @@ dependencies {
     
     // Coil for image loading
     implementation(libs.coil.compose)
+    implementation(libs.ktor.client.core)
+    implementation(libs.ktor.client.content.negotiation)
+    implementation(libs.ktor.serialization.kotlinx.json)
+    implementation(libs.kotlinx.serialization.json)
     
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

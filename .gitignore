@@ -16,6 +16,9 @@
 .cxx
 local.properties
 /backend/node_modules
+/.gradle-local
+/.xcode-derived
+/shared
 
 backend/node_modules/
 backend/data/*.db-wal
