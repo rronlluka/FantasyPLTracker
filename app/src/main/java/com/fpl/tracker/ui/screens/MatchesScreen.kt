@@ -1,5 +1,6 @@
 package com.fpl.tracker.ui.screens
 
+import android.util.Log
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -19,6 +20,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -29,14 +31,33 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.fpl.tracker.data.models.Fixture
+import com.fpl.tracker.data.models.FixtureStat
+import com.fpl.tracker.data.models.FixtureStatValue
 import com.fpl.tracker.data.models.LiveElement
 import com.fpl.tracker.data.models.Player
 import com.fpl.tracker.data.models.Team
 import com.fpl.tracker.viewmodel.MatchesViewModel
 
-// FPL brand colours
-private val FplGreen = Color(0xFF00FF87)
-private val FplLiveRed = Color(0xFFE90052)
+// ─── Stitch design-system tokens ────────────────────────────────────────────
+private val StitchBackground        = Color(0xFF131313)
+private val StitchSurface           = Color(0xFF1C1B1B)
+private val StitchSurfaceContainer  = Color(0xFF20201F)
+private val StitchSurfaceHigh       = Color(0xFF2A2A2A)
+private val StitchSurfaceHighest    = Color(0xFF353535)
+private val StitchPrimary           = Color(0xFFA1D494)
+private val StitchPrimaryContainer  = Color(0xFF2D5A27)
+private val StitchOnPrimary         = Color(0xFF0A3909)
+private val StitchSecondary         = Color(0xFFFFE083)
+private val StitchTertiary          = Color(0xFFFFB3AD)
+private val StitchTertiaryContainer = Color(0xFFA40217)
+private val StitchOnSurface         = Color(0xFFE5E2E1)
+private val StitchOnSurfaceVariant  = Color(0xFFC2C9BB)
+private val StitchOutline           = Color(0xFF8C9387)
+private val StitchOutlineVariant    = Color(0xFF42493E)
+
+// Legacy aliases still used by FixtureCard live-dot
+private val FplGreen   = StitchPrimary
+private val FplLiveRed = StitchTertiaryContainer
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -221,121 +242,134 @@ fun FixtureCard(
     val homeScore = fixture.teamHScore
     val awayScore = fixture.teamAScore
 
-    val cardBg = MaterialTheme.colorScheme.surfaceVariant
-
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick),
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = cardBg),
-        elevation = CardDefaults.cardElevation(defaultElevation = if (isLive) 6.dp else 2.dp)
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = StitchSurface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
-        // Live top banner
-        if (isLive) {
+        // Coloured left accent stripe + optional LIVE banner
+        Box(modifier = Modifier.fillMaxWidth()) {
+            // Left accent bar
             Box(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .background(FplLiveRed)
-                    .padding(horizontal = 12.dp, vertical = 3.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    LiveDot(tint = Color.White)
-                    Spacer(Modifier.width(6.dp))
-                    Text(
-                        text = "LIVE · ${fixture.minutes}'",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White,
-                        letterSpacing = 1.sp
+                    .width(3.dp)
+                    .matchParentSize()
+                    .background(
+                        when {
+                            isLive     -> StitchTertiaryContainer
+                            isFinished -> StitchPrimaryContainer
+                            else       -> StitchOutlineVariant
+                        }
                     )
-                }
-            }
-        }
-
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 14.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Home team
-            TeamBlock(
-                name = homeTeam?.name ?: "Home",
-                shortName = homeTeam?.shortName ?: "?",
-                score = homeScore,
-                showScore = isLive || isFinished,
-                align = Alignment.Start,
-                modifier = Modifier.weight(1.4f)
             )
 
-            // Centre: score divider or kickoff
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(horizontal = 4.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                when {
-                    isLive -> {
-                        Text(
-                            text = "${homeScore ?: 0}  –  ${awayScore ?: 0}",
-                            fontSize = 22.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                    isFinished -> {
-                        Text(
-                            text = "${homeScore ?: 0}  –  ${awayScore ?: 0}",
-                            fontSize = 22.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Text(
-                            text = "FT",
-                            fontSize = 11.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    else -> {
-                        Text(
-                            text = "vs",
-                            fontSize = 15.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        fixture.kickoffTime?.let { kt ->
-                            val time = kt.substringAfter("T").take(5)
+            Column(modifier = Modifier.fillMaxWidth()) {
+                // LIVE top pill banner
+                if (isLive) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(StitchTertiaryContainer)
+                            .padding(horizontal = 16.dp, vertical = 4.dp)
+                    ) {
+                        Row(
+                            Modifier.align(Alignment.Center),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            LiveDot(tint = Color.White)
+                            Spacer(Modifier.width(6.dp))
                             Text(
-                                text = time,
-                                fontSize = 12.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                text = "LIVE · ${fixture.minutes}'",
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White,
+                                letterSpacing = 2.sp
                             )
                         }
                     }
                 }
-            }
 
-            // Away team
-            TeamBlock(
-                name = awayTeam?.name ?: "Away",
-                shortName = awayTeam?.shortName ?: "?",
-                score = awayScore,
-                showScore = isLive || isFinished,
-                align = Alignment.End,
-                modifier = Modifier.weight(1.4f)
-            )
-        }
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 20.dp, end = 16.dp, top = 16.dp, bottom = 16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Home team
+                    TeamBlock(
+                        name = homeTeam?.name ?: "Home",
+                        shortName = homeTeam?.shortName ?: "?",
+                        score = homeScore,
+                        showScore = isLive || isFinished,
+                        align = Alignment.Start,
+                        modifier = Modifier.weight(1.4f)
+                    )
 
-        // Quick goals summary for live/finished games
-        if ((isLive || isFinished) && fixture.stats != null) {
-            val goals = fixture.stats.find { it.identifier == "goals_scored" }
-            if (goals != null && (goals.h.isNotEmpty() || goals.a.isNotEmpty())) {
-                HorizontalDivider(color = Color(0xFFEEEEEE))
-                // We show scorer names inline
-                GoalsSummaryRow(goals.h, goals.a, fixture.stats, emptyList())
+                    // Centre: score or kickoff
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(horizontal = 4.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        when {
+                            isLive -> Text(
+                                text = "${homeScore ?: 0}  –  ${awayScore ?: 0}",
+                                fontSize = 24.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = StitchPrimary
+                            )
+                            isFinished -> {
+                                Text(
+                                    text = "${homeScore ?: 0}  –  ${awayScore ?: 0}",
+                                    fontSize = 24.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = StitchOnSurface
+                                )
+                                Text(
+                                    text = "FT",
+                                    fontSize = 10.sp,
+                                    color = StitchOutline,
+                                    letterSpacing = 2.sp
+                                )
+                            }
+                            else -> {
+                                Text("vs", fontSize = 14.sp, color = StitchOutline)
+                                fixture.kickoffTime?.let { kt ->
+                                    Text(
+                                        text = kt.substringAfter("T").take(5),
+                                        fontSize = 12.sp,
+                                        color = StitchOnSurfaceVariant,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    // Away team
+                    TeamBlock(
+                        name = awayTeam?.name ?: "Away",
+                        shortName = awayTeam?.shortName ?: "?",
+                        score = awayScore,
+                        showScore = isLive || isFinished,
+                        align = Alignment.End,
+                        modifier = Modifier.weight(1.4f)
+                    )
+                }
+
+                // Goals summary footer
+                if ((isLive || isFinished) && fixture.stats != null) {
+                    val goals = fixture.stats.find { it.identifier == "goals_scored" }
+                    if (goals != null && (goals.h.isNotEmpty() || goals.a.isNotEmpty())) {
+                        HorizontalDivider(color = StitchOutlineVariant.copy(alpha = 0.4f))
+                        GoalsSummaryRow(goals.h, goals.a, fixture.stats, emptyList())
+                    }
+                }
             }
         }
     }
@@ -356,34 +390,27 @@ private fun TeamBlock(
     ) {
         Text(
             text = name,
-            fontSize = 14.sp,
-            fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.primary,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Bold,
+            color = StitchOnSurface,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
         Text(
             text = shortName,
-            fontSize = 11.sp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            fontSize = 10.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = StitchOutline,
+            letterSpacing = 1.sp
         )
-        if (showScore && score != null) {
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = score.toString(),
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-        }
     }
 }
 
 @Composable
 private fun GoalsSummaryRow(
-    homeGoals: List<com.fpl.tracker.data.models.FixtureStatValue>,
-    awayGoals: List<com.fpl.tracker.data.models.FixtureStatValue>,
-    @Suppress("UNUSED_PARAMETER") stats: List<com.fpl.tracker.data.models.FixtureStat>?,
+    homeGoals: List<FixtureStatValue>,
+    awayGoals: List<FixtureStatValue>,
+    @Suppress("UNUSED_PARAMETER") stats: List<FixtureStat>?,
     @Suppress("UNUSED_PARAMETER") players: List<Player>
 ) {
     // Simple row showing ⚽ count per side
@@ -394,11 +421,11 @@ private fun GoalsSummaryRow(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        val homeText = if (homeGoals.isNotEmpty()) homeGoals.joinToString(", ") { "⚽ ×${it.value}" } else ""
-        val awayText = if (awayGoals.isNotEmpty()) awayGoals.joinToString(", ") { "⚽ ×${it.value}" } else ""
+        val homeText = if (homeGoals.isNotEmpty()) homeGoals.joinToString("  ") { "⚽ ×${it.value}" } else "—"
+        val awayText = if (awayGoals.isNotEmpty()) awayGoals.joinToString("  ") { "⚽ ×${it.value}" } else "—"
 
-        Text(homeText, fontSize = 11.sp, color = Color.Gray, modifier = Modifier.weight(1f))
-        Text(awayText, fontSize = 11.sp, color = Color.Gray, textAlign = TextAlign.End, modifier = Modifier.weight(1f))
+        Text(homeText, fontSize = 11.sp, color = StitchOnSurfaceVariant, modifier = Modifier.weight(1f))
+        Text(awayText, fontSize = 11.sp, color = StitchOnSurfaceVariant, textAlign = TextAlign.End, modifier = Modifier.weight(1f))
     }
 }
 
@@ -439,7 +466,7 @@ fun FixtureDetailDialog(
     liveElements: List<LiveElement>,
     onDismiss: () -> Unit
 ) {
-    val isLive = fixture.started == true && !fixture.finished && !fixture.finishedProvisional
+    val isLive     = fixture.started == true && !fixture.finished && !fixture.finishedProvisional
     val isFinished = fixture.finished || fixture.finishedProvisional
 
     Dialog(
@@ -448,254 +475,1012 @@ fun FixtureDetailDialog(
     ) {
         Card(
             modifier = Modifier
-                .fillMaxWidth(0.95f)
-                .fillMaxHeight(0.9f),
+                .fillMaxWidth(0.97f)
+                .fillMaxHeight(0.95f),
             shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(containerColor = Color.White),
-            elevation = CardDefaults.cardElevation(defaultElevation = 12.dp)
+            colors = CardDefaults.cardColors(containerColor = StitchBackground),
+            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
         ) {
             Column(modifier = Modifier.fillMaxSize()) {
-                // Header bar
+
+                // ── Top App Bar  ─────────────────────────────────────────
+                // "PITCH-SIDE GALLERY" with back/close + share
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(MaterialTheme.colorScheme.surface)
+                        .background(Color(0xFF131313))
                         .padding(horizontal = 16.dp, vertical = 12.dp)
                 ) {
-                    if (isLive) {
-                        Row(
-                            Modifier.align(Alignment.CenterStart),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            LiveDot(tint = FplGreen)
-                            Spacer(Modifier.width(6.dp))
-                            Text(
-                                "LIVE · ${fixture.minutes}'",
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = FplGreen,
-                                letterSpacing = 1.sp
-                            )
-                        }
-                    } else {
-                        Text(
-                            text = if (isFinished) "Full Time" else "Match Details",
-                            fontSize = 14.sp,
-                            color = Color.White.copy(alpha = 0.8f),
-                            modifier = Modifier.align(Alignment.CenterStart)
+                    // Back/close circle button
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.CenterStart)
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(StitchSurfaceHighest)
+                            .clickable(onClick = onDismiss),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            Icons.Default.Close,
+                            contentDescription = "Close",
+                            tint = StitchPrimary,
+                            modifier = Modifier.size(20.dp)
                         )
                     }
-                    IconButton(
-                        onClick = onDismiss,
-                        modifier = Modifier.align(Alignment.CenterEnd)
-                    ) {
-                        Icon(Icons.Default.Close, "Close", tint = Color.White)
+                    // Title
+                    Text(
+                        text = "PITCH-SIDE GALLERY",
+                        modifier = Modifier.align(Alignment.Center),
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = StitchPrimary,
+                        letterSpacing = 1.sp
+                    )
+                    // LIVE badge or share icon placeholder
+                    if (isLive) {
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.CenterEnd)
+                                .clip(RoundedCornerShape(50))
+                                .background(StitchTertiaryContainer)
+                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                LiveDot(tint = Color.White)
+                                Spacer(Modifier.width(4.dp))
+                                Text(
+                                    "${fixture.minutes}'",
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White,
+                                    letterSpacing = 1.sp
+                                )
+                            }
+                        }
                     }
                 }
 
-                // Score section
+                // ── Scoreboard Hero ──────────────────────────────────────
+                // Card with blurred blob, huge score, team badges
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                .background(
-                    if (isLive)
-                        MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
-                    else
-                        MaterialTheme.colorScheme.surfaceVariant
-                )
-                        .padding(vertical = 20.dp, horizontal = 16.dp)
+                        .background(StitchSurface)
+                        .padding(horizontal = 20.dp, vertical = 24.dp)
                 ) {
-                    Row(
+                    // Status row (Finished / Live dot)
+                    Column(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceEvenly,
-                        verticalAlignment = Alignment.CenterVertically
+                        horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        // Home team
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            modifier = Modifier.weight(1f)
+                        // Status pill
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center,
+                            modifier = Modifier.padding(bottom = 16.dp)
                         ) {
-                            Text(
-                                homeTeam?.name ?: "Home",
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 15.sp,
-                                color = MaterialTheme.colorScheme.surface,
-                                textAlign = TextAlign.Center,
-                                maxLines = 2
+                            Box(
+                                modifier = Modifier
+                                    .size(6.dp)
+                                    .clip(CircleShape)
+                                    .background(
+                                        when {
+                                            isLive     -> StitchTertiaryContainer
+                                            isFinished -> StitchSecondary
+                                            else       -> StitchOutline
+                                        }
+                                    )
                             )
+                            Spacer(Modifier.width(6.dp))
                             Text(
-                                homeTeam?.shortName ?: "",
-                                fontSize = 12.sp,
-                                color = Color.Gray
+                                text = when {
+                                    isLive     -> "LIVE"
+                                    isFinished -> "FINISHED"
+                                    else       -> "UPCOMING"
+                                },
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = when {
+                                    isLive     -> StitchTertiary
+                                    isFinished -> StitchSecondary
+                                    else       -> StitchOutline
+                                },
+                                letterSpacing = 3.sp
                             )
                         }
 
-                        // Score
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            if (isLive || isFinished) {
+                        // Teams + Score row
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // Home team
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                // Team badge placeholder
+                                Box(
+                                    modifier = Modifier
+                                        .size(52.dp)
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(StitchSurfaceContainer),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        homeTeam?.shortName?.take(3) ?: "H",
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.ExtraBold,
+                                        color = StitchOnSurfaceVariant
+                                    )
+                                }
+                                Spacer(Modifier.height(8.dp))
                                 Text(
-                                    "${fixture.teamHScore ?: 0}  –  ${fixture.teamAScore ?: 0}",
-                                    fontSize = 36.sp,
+                                    text = homeTeam?.shortName?.uppercase() ?: "HOME",
+                                    fontSize = 24.sp,
                                     fontWeight = FontWeight.ExtraBold,
-                                    color = if (isLive) FplLiveRed else MaterialTheme.colorScheme.surface
+                                    fontStyle = FontStyle.Italic,
+                                    color = StitchOnSurface,
+                                    letterSpacing = (-0.5).sp
                                 )
-                            } else {
+                                Spacer(Modifier.height(4.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(4.dp))
+                                        .background(StitchSurfaceHighest)
+                                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                                ) {
+                                    Text(
+                                        "Diff: ${fixture.teamHDifficulty}",
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = fdrColor(fixture.teamHDifficulty),
+                                        letterSpacing = 1.sp
+                                    )
+                                }
+                            }
+
+                            // Score
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                modifier = Modifier.padding(horizontal = 4.dp)
+                            ) {
+                                if (isLive || isFinished) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text(
+                                            "${fixture.teamHScore ?: 0}",
+                                            fontSize = 64.sp,
+                                            fontWeight = FontWeight.ExtraBold,
+                                            color = StitchOnSurface,
+                                            letterSpacing = (-2).sp
+                                        )
+                                        Text(
+                                            ":",
+                                            fontSize = 40.sp,
+                                            color = StitchOutlineVariant,
+                                            modifier = Modifier.padding(horizontal = 6.dp)
+                                        )
+                                        Text(
+                                            "${fixture.teamAScore ?: 0}",
+                                            fontSize = 64.sp,
+                                            fontWeight = FontWeight.ExtraBold,
+                                            color = StitchOnSurface,
+                                            letterSpacing = (-2).sp
+                                        )
+                                    }
+                                } else {
+                                    Text(
+                                        "VS",
+                                        fontSize = 32.sp,
+                                        fontWeight = FontWeight.ExtraBold,
+                                        color = StitchOutline
+                                    )
+                                }
+                                Spacer(Modifier.height(4.dp))
                                 Text(
-                                    "vs",
-                                    fontSize = 28.sp,
-                                    color = Color.Gray
+                                    text = fixture.kickoffTime
+                                        ?.substringBefore("Z")
+                                        ?.replace("T", " • ")
+                                        ?: "",
+                                    fontSize = 10.sp,
+                                    color = StitchOutline,
+                                    letterSpacing = 1.sp,
+                                    fontWeight = FontWeight.SemiBold
                                 )
-                                fixture.kickoffTime?.let { kt ->
-                                    val time = kt.substringAfter("T").take(5)
-                                    val date = kt.substringBefore("T")
-                                    Text(time, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.surface)
-                                    Text(date, fontSize = 12.sp, color = Color.Gray)
+                            }
+
+                            // Away team
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(52.dp)
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(StitchSurfaceContainer),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        awayTeam?.shortName?.take(3) ?: "A",
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.ExtraBold,
+                                        color = StitchOnSurfaceVariant
+                                    )
+                                }
+                                Spacer(Modifier.height(8.dp))
+                                Text(
+                                    text = awayTeam?.shortName?.uppercase() ?: "AWAY",
+                                    fontSize = 24.sp,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    fontStyle = FontStyle.Italic,
+                                    color = StitchOnSurface,
+                                    letterSpacing = (-0.5).sp
+                                )
+                                Spacer(Modifier.height(4.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(4.dp))
+                                        .background(StitchSurfaceHighest)
+                                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                                ) {
+                                    Text(
+                                        "Diff: ${fixture.teamADifficulty}",
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = fdrColor(fixture.teamADifficulty),
+                                        letterSpacing = 1.sp
+                                    )
                                 }
                             }
                         }
-
-                        // Away team
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Text(
-                                awayTeam?.name ?: "Away",
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 15.sp,
-                                color = MaterialTheme.colorScheme.surface,
-                                textAlign = TextAlign.Center,
-                                maxLines = 2
-                            )
-                            Text(
-                                awayTeam?.shortName ?: "",
-                                fontSize = 12.sp,
-                                color = Color.Gray
-                            )
-                        }
                     }
                 }
 
-                HorizontalDivider(color = Color(0xFFEEEEEE))
+                HorizontalDivider(color = StitchOutlineVariant.copy(alpha = 0.4f))
 
-                // Scrollable body
+                // ── Scrollable body ──────────────────────────────────────
                 Column(
                     modifier = Modifier
                         .weight(1f)
                         .verticalScroll(rememberScrollState())
-                        .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                        .padding(horizontal = 14.dp, vertical = 14.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-
-                    // ── Match info ──────────────────────────────────────
-                    SectionHeader("Match Info")
-                    InfoCard {
-                        InfoRow("Status", when {
-                            isLive -> "🔴 Live (${fixture.minutes}')"
-                            isFinished -> "✅ Finished"
-                            else -> "⏳ Not started"
-                        })
-                        fixture.kickoffTime?.let { kt ->
-                            InfoRow("Kickoff", kt.substringBefore("Z").replace("T", " "))
+                    // ── Live player stats ────────────────────────────────
+                    if (isLive && liveElements.isNotEmpty()) {
+                        MatchReportBentoCard(
+                            icon = "⚡",
+                            iconColor = StitchTertiary,
+                            title = "Live Player Stats"
+                        ) {
+                            LivePlayerStatsSection(
+                                fixture = fixture,
+                                homeTeam = homeTeam,
+                                awayTeam = awayTeam,
+                                players = players,
+                                liveElements = liveElements
+                            )
                         }
-                        InfoRow("Home difficulty", "★".repeat(fixture.teamHDifficulty) + "☆".repeat(5 - fixture.teamHDifficulty))
-                        InfoRow("Away difficulty", "★".repeat(fixture.teamADifficulty) + "☆".repeat(5 - fixture.teamADifficulty))
                     }
 
-                    // ── Live player stats (only during live games) ──────
-                    if (isLive && liveElements.isNotEmpty()) {
-                        SectionHeader("🔴 Live Player Stats")
-                        LivePlayerStatsSection(
-                            fixture = fixture,
-                            homeTeam = homeTeam,
-                            awayTeam = awayTeam,
-                            players = players,
-                            liveElements = liveElements
+                    // ── Bento grid of stat cards ─────────────────────────
+                    val allStats = fixture.stats ?: emptyList()
+
+                    // Goals
+                    val goalsStat = allStats.find { it.identifier == "goals_scored" }
+                    val ownGoalsStat = allStats.find { it.identifier == "own_goals" }
+                    val homeGoalEntries = buildGoalEntries(
+                        scoringEntries = goalsStat?.h.orEmpty(),
+                        ownGoalEntries = ownGoalsStat?.a.orEmpty(),
+                        scoringTeamShort = homeTeam?.shortName ?: "H",
+                        ownGoalTeamShort = awayTeam?.shortName ?: "A",
+                        players = players
+                    )
+                    val awayGoalEntries = buildGoalEntries(
+                        scoringEntries = goalsStat?.a.orEmpty(),
+                        ownGoalEntries = ownGoalsStat?.h.orEmpty(),
+                        scoringTeamShort = awayTeam?.shortName ?: "A",
+                        ownGoalTeamShort = homeTeam?.shortName ?: "H",
+                        players = players
+                    )
+                    if (homeGoalEntries.isNotEmpty() || awayGoalEntries.isNotEmpty()) {
+                        MatchReportBentoCard(
+                            icon = "⚽",
+                            iconColor = StitchPrimary,
+                            title = "Goals",
+                            count = (homeGoalEntries.sumOf { it.count } + awayGoalEntries.sumOf { it.count }).toString()
+                        ) {
+                            GoalEventPlayerList(
+                                homeEntries = homeGoalEntries,
+                                awayEntries = awayGoalEntries,
+                                homeShort = homeTeam?.shortName ?: "H",
+                                awayShort = awayTeam?.shortName ?: "A"
+                            )
+                        }
+                    }
+
+                    // Assists
+                    val assistsStat = allStats.find { it.identifier == "assists" }
+                    if (assistsStat != null && (assistsStat.h.isNotEmpty() || assistsStat.a.isNotEmpty())) {
+                        MatchReportBentoCard(
+                            icon = "🔗",
+                            iconColor = Color(0xFF9DD090),
+                            title = "Assists"
+                        ) {
+                            MatchStatPlayerList(
+                                homePlayers = assistsStat.h,
+                                awayPlayers = assistsStat.a,
+                                allPlayers = players,
+                                homeShort = homeTeam?.shortName ?: "H",
+                                awayShort = awayTeam?.shortName ?: "A"
+                            )
+                        }
+                    }
+
+                    // Saves
+                    val savesStat = allStats.find { it.identifier == "saves" }
+                    if (savesStat != null && (savesStat.h.isNotEmpty() || savesStat.a.isNotEmpty())) {
+                        MatchReportBentoCard(
+                            icon = "🧤",
+                            iconColor = StitchSecondary,
+                            title = "Saves"
+                        ) {
+                            MatchStatPlayerList(
+                                homePlayers = savesStat.h,
+                                awayPlayers = savesStat.a,
+                                allPlayers = players,
+                                homeShort = homeTeam?.shortName ?: "H",
+                                awayShort = awayTeam?.shortName ?: "A",
+                                showCount = true
+                            )
+                        }
+                    }
+
+                    // Yellow cards
+                    val yellowStat = allStats.find { it.identifier == "yellow_cards" }
+                    if (yellowStat != null && (yellowStat.h.isNotEmpty() || yellowStat.a.isNotEmpty())) {
+                        MatchReportBentoCard(
+                            icon = "🟨",
+                            iconColor = StitchSecondary,
+                            title = "Yellow Cards"
+                        ) {
+                            MatchStatPlayerList(
+                                homePlayers = yellowStat.h,
+                                awayPlayers = yellowStat.a,
+                                allPlayers = players,
+                                homeShort = homeTeam?.shortName ?: "H",
+                                awayShort = awayTeam?.shortName ?: "A"
+                            )
+                        }
+                    }
+
+                    // Red cards
+                    val redStat = allStats.find { it.identifier == "red_cards" }
+                    if (redStat != null && (redStat.h.isNotEmpty() || redStat.a.isNotEmpty())) {
+                        MatchReportBentoCard(
+                            icon = "🟥",
+                            iconColor = StitchTertiaryContainer,
+                            title = "Red Cards"
+                        ) {
+                            MatchStatPlayerList(
+                                homePlayers = redStat.h,
+                                awayPlayers = redStat.a,
+                                allPlayers = players,
+                                homeShort = homeTeam?.shortName ?: "H",
+                                awayShort = awayTeam?.shortName ?: "A"
+                            )
+                        }
+                    }
+
+                    // Bonus Points
+                    val bonusStat = allStats.find { it.identifier == "bonus" }
+                    if (bonusStat != null && (bonusStat.h.isNotEmpty() || bonusStat.a.isNotEmpty())) {
+                        MatchReportBentoCard(
+                            icon = "🏅",
+                            iconColor = StitchPrimary,
+                            title = "Bonus Points"
+                        ) {
+                            MatchStatPlayerList(
+                                homePlayers = bonusStat.h,
+                                awayPlayers = bonusStat.a,
+                                allPlayers = players,
+                                homeShort = homeTeam?.shortName ?: "H",
+                                awayShort = awayTeam?.shortName ?: "A",
+                                showCount = true
+                            )
+                        }
+                    }
+
+                    // Defensive Contributions
+                    val defensiveContributionsStat = allStats.firstOrNull {
+                        it.identifier.contains("def", ignoreCase = true) ||
+                            it.identifier == "defensive_contributions" ||
+                            it.identifier == "defensive" ||
+                            it.identifier == "def_contributions"
+                    }
+
+                    val defensiveContributionEntries = buildDefensiveContributionEntries(
+                        fixtureId = fixture.id,
+                        fixtureStat = defensiveContributionsStat,
+                        players = players,
+                        liveElements = liveElements,
+                        homeTeamId = fixture.teamH,
+                        awayTeamId = fixture.teamA
+                    )
+                    defensiveContributionEntries.away.forEach {
+
+                        Log.d("rronirroni", "$defensiveContributionsStat")
+                    }
+                    if (defensiveContributionEntries.home.isNotEmpty() || defensiveContributionEntries.away.isNotEmpty()) {
+                        DefensiveContributionCard(
+                            homeEntries = defensiveContributionEntries.home,
+                            awayEntries = defensiveContributionEntries.away,
+                            homeTeamName = homeTeam?.name ?: "Home",
+                            awayTeamName = awayTeam?.name ?: "Away"
                         )
                     }
 
-                    // ── Fixture event stats ─────────────────────────────
-                    val relevantStats = fixture.stats?.filter { stat ->
-                        (stat.h.isNotEmpty() || stat.a.isNotEmpty()) &&
-                                stat.identifier != "bps" // BPS is internal, skip unless wanted
-                    } ?: emptyList()
+                    // BPS Table
+                    val bpsStat = allStats.find { it.identifier == "bps" }
+                    if (bpsStat != null && (bpsStat.h.isNotEmpty() || bpsStat.a.isNotEmpty())) {
+                        BpsTableCard(
+                            stat = bpsStat,
+                            homeTeamShort = homeTeam?.shortName ?: "H",
+                            awayTeamShort = awayTeam?.shortName ?: "A",
+                            players = players
+                        )
+                    }
 
-                    if (relevantStats.isNotEmpty()) {
-                        SectionHeader(if (isLive) "Match Events" else "Match Statistics")
-                        relevantStats.forEach { stat ->
-                            StatCard(
-                                stat = stat,
-                                homeTeamName = homeTeam?.shortName ?: "H",
-                                awayTeamName = awayTeam?.shortName ?: "A",
-                                players = players
-                            )
-                        }
-                    } else if (isLive) {
-                        InfoCard {
+                    // No stats fallback
+                    if (allStats.isEmpty() && !isLive) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(StitchSurfaceHigh)
+                                .padding(24.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
                             Text(
-                                "Stats update as the game progresses…",
+                                text = if (isFinished) "No detailed stats available" else "Stats appear once the match starts",
                                 fontSize = 13.sp,
-                                color = Color.Gray,
-                                textAlign = TextAlign.Center,
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                        }
-                    } else if (isFinished) {
-                        InfoCard {
-                            Text(
-                                "No detailed stats available for this match",
-                                fontSize = 13.sp,
-                                color = Color.Gray,
-                                textAlign = TextAlign.Center,
-                                modifier = Modifier.fillMaxWidth()
+                                color = StitchOutline,
+                                textAlign = TextAlign.Center
                             )
                         }
                     }
 
-                    // ── Bonus points section ────────────────────────────
-                    val bpsStat = fixture.stats?.find { it.identifier == "bps" }
-                    val bonusStat = fixture.stats?.find { it.identifier == "bonus" }
-                    if (bpsStat != null || bonusStat != null) {
-                        SectionHeader("⭐ Bonus & BPS")
-                        if (bonusStat != null && (bonusStat.h.isNotEmpty() || bonusStat.a.isNotEmpty())) {
-                            StatCard(
-                                stat = bonusStat,
-                                homeTeamName = homeTeam?.shortName ?: "H",
-                                awayTeamName = awayTeam?.shortName ?: "A",
-                                players = players,
-                                label = "Bonus Points"
-                            )
-                        }
-                        if (bpsStat != null && (bpsStat.h.isNotEmpty() || bpsStat.a.isNotEmpty())) {
-                            BpsCard(
-                                stat = bpsStat,
-                                homeTeamName = homeTeam?.shortName ?: "H",
-                                awayTeamName = awayTeam?.shortName ?: "A",
-                                players = players
-                            )
-                        }
+                    Spacer(Modifier.height(8.dp))
+                }
+            }
+        }
+    }
+}
+
+// ── Bento card wrapper  ───────────────────────────────────────────────────────
+@Composable
+private fun MatchReportBentoCard(
+    icon: String,
+    iconColor: Color,
+    title: String,
+    count: String? = null,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(StitchSurfaceContainer)
+            .padding(16.dp)
+    ) {
+        // Card header
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(icon, fontSize = 16.sp)
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    title.uppercase(),
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    fontStyle = FontStyle.Italic,
+                    color = iconColor,
+                    letterSpacing = 1.sp
+                )
+            }
+            if (count != null) {
+                Text(
+                    count,
+                    fontSize = 28.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = iconColor,
+                    letterSpacing = (-1).sp
+                )
+            }
+        }
+        HorizontalDivider(color = StitchOutlineVariant.copy(alpha = 0.3f), modifier = Modifier.padding(bottom = 10.dp))
+        content()
+    }
+}
+
+// ── Two-column player list inside a bento card ────────────────────────────────
+@Composable
+private fun MatchStatPlayerList(
+    homePlayers: List<FixtureStatValue>,
+    awayPlayers: List<FixtureStatValue>,
+    allPlayers: List<Player>,
+    homeShort: String,
+    awayShort: String,
+    showMinute: Boolean = false,
+    showCount: Boolean = false
+) {
+    Row(modifier = Modifier.fillMaxWidth()) {
+        // Home column
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            if (homePlayers.isEmpty()) {
+                Text("—", fontSize = 12.sp, color = StitchOutlineVariant)
+            } else {
+                homePlayers.forEach { sv ->
+                    val name = allPlayers.find { it.id == sv.element }?.webName ?: "P${sv.element}"
+                    Column {
+                        Text(
+                            name,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = StitchOnSurface
+                        )
+                        Text(
+                            buildString {
+                                append(homeShort)
+                                if (showCount && sv.value > 1) append(" ×${sv.value}")
+                            },
+                            fontSize = 10.sp,
+                            color = StitchOutline,
+                            letterSpacing = 1.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
                     }
                 }
-
-                // Bottom close button
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(Color(0xFFF8F8F8))
-                        .padding(12.dp)
-                ) {
-                    Button(
-                        onClick = onDismiss,
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surface),
-                        shape = RoundedCornerShape(10.dp)
-                    ) {
-                        Text("Close", color = Color.White, fontWeight = FontWeight.SemiBold)
+            }
+        }
+        Spacer(Modifier.width(8.dp))
+        // Away column
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+            horizontalAlignment = Alignment.End
+        ) {
+            if (awayPlayers.isEmpty()) {
+                Text("—", fontSize = 12.sp, color = StitchOutlineVariant, textAlign = TextAlign.End)
+            } else {
+                awayPlayers.forEach { sv ->
+                    val name = allPlayers.find { it.id == sv.element }?.webName ?: "P${sv.element}"
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text(
+                            name,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = StitchOnSurface,
+                            textAlign = TextAlign.End
+                        )
+                        Text(
+                            buildString {
+                                append(awayShort)
+                                if (showCount && sv.value > 1) append(" ×${sv.value}")
+                            },
+                            fontSize = 10.sp,
+                            color = StitchOutline,
+                            letterSpacing = 1.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            textAlign = TextAlign.End
+                        )
                     }
                 }
             }
         }
     }
+}
+
+private data class GoalEventEntry(
+    val playerName: String,
+    val teamShort: String,
+    val count: Int,
+    val isOwnGoal: Boolean
+)
+
+private data class DefensiveContributionEntry(
+    val playerName: String,
+    val value: Int
+)
+
+private data class DefensiveContributionEntries(
+    val home: List<DefensiveContributionEntry>,
+    val away: List<DefensiveContributionEntry>
+)
+
+private fun buildGoalEntries(
+    scoringEntries: List<FixtureStatValue>,
+    ownGoalEntries: List<FixtureStatValue>,
+    scoringTeamShort: String,
+    ownGoalTeamShort: String,
+    players: List<Player>
+): List<GoalEventEntry> {
+    val scored = scoringEntries.map { entry ->
+        GoalEventEntry(
+            playerName = players.find { it.id == entry.element }?.webName ?: "P${entry.element}",
+            teamShort = scoringTeamShort,
+            count = entry.value,
+            isOwnGoal = false
+        )
+    }
+    val ownGoals = ownGoalEntries.map { entry ->
+        GoalEventEntry(
+            playerName = players.find { it.id == entry.element }?.webName ?: "P${entry.element}",
+            teamShort = ownGoalTeamShort,
+            count = entry.value,
+            isOwnGoal = true
+        )
+    }
+    return scored + ownGoals
+}
+
+private fun  buildDefensiveContributionEntries(
+    fixtureId: Int,
+    fixtureStat: FixtureStat?,
+    players: List<Player>,
+    liveElements: List<LiveElement>,
+    homeTeamId: Int,
+    awayTeamId: Int
+): DefensiveContributionEntries {
+    val playersById = players.associateBy { it.id }
+    val fromLive = liveElements.mapNotNull { liveElement ->
+        val player = playersById[liveElement.id] ?: return@mapNotNull null
+        val defensiveValue = liveElement.explain
+            ?.firstOrNull { it.fixture == fixtureId }
+            ?.stats
+            ?.firstOrNull {
+                it.identifier.contains("def", ignoreCase = true) ||
+                    it.identifier == "defensive_contributions" ||
+                    it.identifier == "defensive" ||
+                    it.identifier == "def_contributions"
+            }
+            ?.value
+            ?: return@mapNotNull null
+
+        when (player.team) {
+            homeTeamId -> player.team to DefensiveContributionEntry(player.webName, defensiveValue)
+            awayTeamId -> player.team to DefensiveContributionEntry(player.webName, defensiveValue)
+            else -> null
+        }
+    }
+
+    val liveEntriesHome = fromLive.filter { it.first == homeTeamId }.map { it.second }
+    val liveEntriesAway = fromLive.filter { it.first == awayTeamId }.map { it.second }
+
+    fun mapFixtureEntries(entries: List<FixtureStatValue>): List<DefensiveContributionEntry> =
+        entries.map { entry ->
+            DefensiveContributionEntry(
+                playerName = playersById[entry.element]?.webName ?: "P${entry.element}",
+                value = entry.value
+            )
+        }
+
+    val fixtureEntriesHome = mapFixtureEntries(fixtureStat?.h.orEmpty())
+    val fixtureEntriesAway = mapFixtureEntries(fixtureStat?.a.orEmpty())
+
+    // Merge live and fixture entries, preferring live if a player exists in both
+    val combinedHome = (liveEntriesHome + fixtureEntriesHome).distinctBy { it.playerName }
+        .filter { it.value > 0 }.sortedByDescending { it.value }
+    val combinedAway = (liveEntriesAway + fixtureEntriesAway).distinctBy { it.playerName }
+        .filter { it.value > 0 }.sortedByDescending { it.value }
+
+    return DefensiveContributionEntries(
+        home = combinedHome,
+        away = combinedAway
+    )
+}
+
+@Composable
+private fun GoalEventPlayerList(
+    homeEntries: List<GoalEventEntry>,
+    awayEntries: List<GoalEventEntry>,
+    homeShort: String,
+    awayShort: String
+) {
+    Row(modifier = Modifier.fillMaxWidth()) {
+        GoalEventColumn(
+            modifier = Modifier.weight(1f),
+            entries = homeEntries,
+            fallbackLabel = homeShort,
+            horizontalAlignment = Alignment.Start,
+            textAlign = TextAlign.Start
+        )
+        Spacer(Modifier.width(8.dp))
+        GoalEventColumn(
+            modifier = Modifier.weight(1f),
+            entries = awayEntries,
+            fallbackLabel = awayShort,
+            horizontalAlignment = Alignment.End,
+            textAlign = TextAlign.End
+        )
+    }
+}
+
+@Composable
+private fun GoalEventColumn(
+    entries: List<GoalEventEntry>,
+    fallbackLabel: String,
+    horizontalAlignment: Alignment.Horizontal,
+    textAlign: TextAlign,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+        horizontalAlignment = horizontalAlignment
+    ) {
+        if (entries.isEmpty()) {
+            Text("—", fontSize = 12.sp, color = StitchOutlineVariant, textAlign = textAlign)
+        } else {
+            entries.forEach { entry ->
+                Column(horizontalAlignment = horizontalAlignment) {
+                    Text(
+                        entry.playerName,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = StitchOnSurface,
+                        textAlign = textAlign
+                    )
+                    Text(
+                        buildString {
+                            append(entry.teamShort.ifBlank { fallbackLabel })
+                            if (entry.isOwnGoal) append(" • Own Goal")
+                            if (entry.count > 1) append(" ×${entry.count}")
+                        },
+                        fontSize = 10.sp,
+                        color = if (entry.isOwnGoal) StitchTertiary else StitchOutline,
+                        letterSpacing = 1.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        textAlign = textAlign
+                    )
+                }
+            }
+        }
+    }
+}
+
+// ── BPS Table card ────────────────────────────────────────────────────────────
+@Composable
+private fun BpsTableCard(
+    stat: FixtureStat,
+    homeTeamShort: String,
+    awayTeamShort: String,
+    players: List<Player>
+) {
+    val allEntries = (stat.h.map { it to homeTeamShort } + stat.a.map { it to awayTeamShort })
+        .sortedByDescending { it.first.value }
+        .take(8)
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(StitchSurfaceContainer)
+            .padding(16.dp)
+    ) {
+        // Header
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column {
+                Text(
+                    "BONUS POINT SYSTEM",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    fontStyle = FontStyle.Italic,
+                    color = StitchPrimary,
+                    letterSpacing = 1.sp
+                )
+                Text(
+                    "BPS Breakdown & Advanced Metrics",
+                    fontSize = 9.sp,
+                    color = StitchOutline,
+                    letterSpacing = 0.5.sp
+                )
+            }
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(CircleShape)
+                    .background(StitchPrimary.copy(alpha = 0.1f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("📊", fontSize = 16.sp)
+            }
+        }
+        HorizontalDivider(color = StitchOutlineVariant.copy(alpha = 0.3f), modifier = Modifier.padding(bottom = 10.dp))
+        // Table header
+        Row(modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp)) {
+            Text("PLAYER", modifier = Modifier.weight(1.8f), fontSize = 9.sp, color = StitchOutline, letterSpacing = 1.5.sp, fontWeight = FontWeight.Bold)
+            Text("TEAM",   modifier = Modifier.weight(0.8f), fontSize = 9.sp, color = StitchOutline, letterSpacing = 1.5.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.End)
+            Text("BPS",    modifier = Modifier.weight(0.8f), fontSize = 9.sp, color = StitchOutline, letterSpacing = 1.5.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.End)
+        }
+        HorizontalDivider(color = StitchOutlineVariant.copy(alpha = 0.2f), modifier = Modifier.padding(bottom = 4.dp))
+        // Table rows
+        allEntries.forEachIndexed { idx, (sv, team) ->
+            val name = players.find { it.id == sv.element }?.webName ?: "P${sv.element}"
+            val rowBg = if (idx % 2 == 0) Color.Transparent else StitchSurfaceHigh.copy(alpha = 0.4f)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(rowBg)
+                    .padding(vertical = 5.dp)
+            ) {
+                Text(
+                    name,
+                    modifier = Modifier.weight(1.8f),
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = StitchOnSurface
+                )
+                Text(
+                    team,
+                    modifier = Modifier.weight(0.8f),
+                    fontSize = 11.sp,
+                    color = StitchOutline,
+                    textAlign = TextAlign.End
+                )
+                Text(
+                    sv.value.toString(),
+                    modifier = Modifier.weight(0.8f),
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    fontStyle = FontStyle.Italic,
+                    color = StitchSecondary,
+                    textAlign = TextAlign.End
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun DefensiveContributionCard(
+    homeEntries: List<DefensiveContributionEntry>,
+    awayEntries: List<DefensiveContributionEntry>,
+    homeTeamName: String,
+    awayTeamName: String
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(StitchSurface)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(StitchSurfaceContainer)
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    text = "🛡 Defensive Contribution",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    fontStyle = FontStyle.Italic,
+                    color = StitchOnSurface
+                )
+                Text(
+                    text = "Total recoveries & clearances",
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = StitchOutline,
+                    letterSpacing = 1.sp
+                )
+            }
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            DefensiveContributionColumn(
+                modifier = Modifier.weight(1f),
+                teamName = homeTeamName,
+                accentColor = StitchPrimary,
+                entries = homeEntries
+            )
+            DefensiveContributionColumn(
+                modifier = Modifier.weight(1f),
+                teamName = awayTeamName,
+                accentColor = StitchTertiary,
+                entries = awayEntries
+            )
+        }
+    }
+}
+
+@Composable
+private fun DefensiveContributionColumn(
+    teamName: String,
+    accentColor: Color,
+    entries: List<DefensiveContributionEntry>,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .background(StitchSurface)
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Text(
+            text = teamName.uppercase(),
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Bold,
+            color = accentColor,
+            letterSpacing = 1.5.sp
+        )
+        if (entries.isEmpty()) {
+            Text("—", fontSize = 12.sp, color = StitchOutlineVariant)
+        } else {
+            entries.forEach { entry ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.Bottom
+                ) {
+                    Text(
+                        text = entry.playerName,
+                        fontSize = 18.sp,
+                        color = StitchOnSurface,
+                        fontWeight = FontWeight.Medium
+                    )
+                    Text(
+                        text = entry.value.toString().padStart(2, '0'),
+                        fontSize = 28.sp,
+                        color = StitchOnSurfaceVariant.copy(alpha = 0.35f),
+                        fontWeight = FontWeight.ExtraBold
+                    )
+                }
+                HorizontalDivider(color = StitchOutlineVariant.copy(alpha = 0.2f))
+            }
+        }
+    }
+}
+
+// Small coloured difficulty dots (FDR 1–5)
+@Composable
+private fun DifficultyDots(fdr: Int) {
+    Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+        for (i in 1..5) {
+            Box(
+                modifier = Modifier
+                    .size(6.dp)
+                    .clip(CircleShape)
+                    .background(if (i <= fdr) fdrColor(fdr) else StitchOutlineVariant)
+            )
+        }
+    }
+}
+
+private fun fdrColor(fdr: Int): Color = when (fdr) {
+    1, 2 -> Color(0xFF47D185)
+    3    -> Color(0xFFFFE083)
+    4    -> Color(0xFFFFB3AD)
+    else -> Color(0xFFA40217)
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -732,21 +1517,27 @@ private fun LivePlayerStatsSection(
         return
     }
 
-    // Header row
+    // Column headers
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 8.dp),
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
         Text(
-            homeTeam?.shortName ?: "Home",
+            text = (homeTeam?.shortName ?: "Home").uppercase(),
+            fontSize = 10.sp,
             fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.surface,
+            color = StitchOutline,
+            letterSpacing = 2.sp,
             modifier = Modifier.weight(1f)
         )
         Text(
-            awayTeam?.shortName ?: "Away",
+            text = (awayTeam?.shortName ?: "Away").uppercase(),
+            fontSize = 10.sp,
             fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.surface,
+            color = StitchOutline,
+            letterSpacing = 2.sp,
             textAlign = TextAlign.End,
             modifier = Modifier.weight(1f)
         )
@@ -754,31 +1545,35 @@ private fun LivePlayerStatsSection(
 
     val maxRows = maxOf(homeLive.size, awayLive.size)
     for (i in 0 until maxRows) {
-        val homeEl = homeLive.getOrNull(i)
-        val awayEl = awayLive.getOrNull(i)
+        val homeEl     = homeLive.getOrNull(i)
+        val awayEl     = awayLive.getOrNull(i)
         val homePlayer = homeEl?.let { el -> players.find { it.id == el.id } }
         val awayPlayer = awayEl?.let { el -> players.find { it.id == el.id } }
 
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 2.dp),
+                .padding(vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             // Home player
             Column(modifier = Modifier.weight(1f)) {
                 if (homePlayer != null && homeEl != null) {
-                    Text(homePlayer.webName, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                    Text(
+                        homePlayer.webName,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = StitchOnSurface
+                    )
                     Text(
                         buildLiveStatsSummary(homeEl),
                         fontSize = 11.sp,
-                        color = Color.Gray,
+                        color = StitchOutline,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
                 }
             }
-
             // Away player
             Column(
                 modifier = Modifier.weight(1f),
@@ -789,12 +1584,13 @@ private fun LivePlayerStatsSection(
                         awayPlayer.webName,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.SemiBold,
+                        color = StitchOnSurface,
                         textAlign = TextAlign.End
                     )
                     Text(
                         buildLiveStatsSummary(awayEl),
                         fontSize = 11.sp,
-                        color = Color.Gray,
+                        color = StitchOutline,
                         textAlign = TextAlign.End,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
@@ -831,7 +1627,7 @@ private fun buildLiveStatsSummary(el: LiveElement): String {
 
 @Composable
 private fun StatCard(
-    stat: com.fpl.tracker.data.models.FixtureStat,
+    stat: FixtureStat,
     homeTeamName: String,
     awayTeamName: String,
     players: List<Player>,
@@ -850,65 +1646,91 @@ private fun StatCard(
         else -> stat.identifier.replace("_", " ").replaceFirstChar { it.uppercase() }
     }
 
-    Card(
-        colors = CardDefaults.cardColors(containerColor = Color(0xFFF7F7F7)),
-        shape = RoundedCornerShape(10.dp),
-        modifier = Modifier.fillMaxWidth()
+    // accent colour for the left border based on stat type
+    val accentColor = when {
+        stat.identifier.contains("goal")   -> StitchPrimary
+        stat.identifier.contains("assist") -> StitchSecondary
+        stat.identifier.contains("card")   -> StitchTertiary
+        stat.identifier.contains("bonus")  -> StitchSecondary
+        else                               -> StitchOutlineVariant
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(StitchSurfaceHigh)
     ) {
-        Column(modifier = Modifier.padding(12.dp)) {
-            // Stat type label + team headers
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    statLabel,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.surface
-                )
-            }
-
+        // Left accent stripe
+        Box(
+            modifier = Modifier
+                .width(3.dp)
+                .matchParentSize()
+                .background(accentColor)
+        )
+        Column(modifier = Modifier.padding(start = 16.dp, end = 12.dp, top = 12.dp, bottom = 12.dp)) {
+            Text(
+                statLabel,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                color = StitchOutline,
+                letterSpacing = 1.5.sp
+            )
             Spacer(Modifier.height(8.dp))
-
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                // Home players
+                // Home
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(homeTeamName, fontSize = 11.sp, color = Color.Gray, fontWeight = FontWeight.SemiBold)
+                    Text(
+                        homeTeamName.uppercase(),
+                        fontSize = 10.sp,
+                        color = StitchOutline,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.sp
+                    )
                     Spacer(Modifier.height(4.dp))
                     if (stat.h.isEmpty()) {
-                        Text("—", fontSize = 12.sp, color = Color.LightGray)
+                        Text("—", fontSize = 12.sp, color = StitchOutlineVariant)
                     } else {
                         stat.h.forEach { sv ->
-                            val p = players.find { it.id == sv.element }
-                            val name = p?.webName ?: "Player ${sv.element}"
+                            val name = players.find { it.id == sv.element }?.webName ?: "Player ${sv.element}"
                             val valStr = if (sv.value > 1) " ×${sv.value}" else ""
-                            Text("$name$valStr", fontSize = 12.sp, color = Color.DarkGray)
+                            Text(
+                                "$name$valStr",
+                                fontSize = 12.sp,
+                                color = StitchOnSurface,
+                                fontWeight = FontWeight.SemiBold
+                            )
                         }
                     }
                 }
-
                 Spacer(Modifier.width(8.dp))
-
-                // Away players
-                Column(
-                    modifier = Modifier.weight(1f),
-                    horizontalAlignment = Alignment.End
-                ) {
-                    Text(awayTeamName, fontSize = 11.sp, color = Color.Gray, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.End)
+                // Away
+                Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.End) {
+                    Text(
+                        awayTeamName.uppercase(),
+                        fontSize = 10.sp,
+                        color = StitchOutline,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.sp,
+                        textAlign = TextAlign.End
+                    )
                     Spacer(Modifier.height(4.dp))
                     if (stat.a.isEmpty()) {
-                        Text("—", fontSize = 12.sp, color = Color.LightGray, textAlign = TextAlign.End)
+                        Text("—", fontSize = 12.sp, color = StitchOutlineVariant, textAlign = TextAlign.End)
                     } else {
                         stat.a.forEach { sv ->
-                            val p = players.find { it.id == sv.element }
-                            val name = p?.webName ?: "Player ${sv.element}"
+                            val name = players.find { it.id == sv.element }?.webName ?: "Player ${sv.element}"
                             val valStr = if (sv.value > 1) " ×${sv.value}" else ""
-                            Text("$name$valStr", fontSize = 12.sp, color = Color.DarkGray, textAlign = TextAlign.End)
+                            Text(
+                                "$name$valStr",
+                                fontSize = 12.sp,
+                                color = StitchOnSurface,
+                                fontWeight = FontWeight.SemiBold,
+                                textAlign = TextAlign.End
+                            )
                         }
                     }
                 }
@@ -919,47 +1741,86 @@ private fun StatCard(
 
 @Composable
 private fun BpsCard(
-    stat: com.fpl.tracker.data.models.FixtureStat,
+    stat: FixtureStat,
     homeTeamName: String,
     awayTeamName: String,
     players: List<Player>
 ) {
-    Card(
-        colors = CardDefaults.cardColors(containerColor = Color(0xFFF7F7F7)),
-        shape = RoundedCornerShape(10.dp),
-        modifier = Modifier.fillMaxWidth()
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(StitchSurfaceHigh)
     ) {
-        Column(modifier = Modifier.padding(12.dp)) {
-            Text("BPS (Bonus Point System)", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.surface)
+        Box(
+            modifier = Modifier
+                .width(3.dp)
+                .matchParentSize()
+                .background(StitchSecondary)
+        )
+        Column(modifier = Modifier.padding(start = 16.dp, end = 12.dp, top = 12.dp, bottom = 12.dp)) {
+            Text(
+                "BPS (BONUS POINT SYSTEM)",
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                color = StitchOutline,
+                letterSpacing = 1.5.sp
+            )
             Spacer(Modifier.height(8.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(homeTeamName, fontSize = 11.sp, color = Color.Gray, fontWeight = FontWeight.SemiBold)
+                    Text(
+                        homeTeamName.uppercase(),
+                        fontSize = 10.sp,
+                        color = StitchOutline,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.sp
+                    )
                     Spacer(Modifier.height(4.dp))
                     val top = stat.h.sortedByDescending { it.value }.take(5)
                     if (top.isEmpty()) {
-                        Text("—", fontSize = 12.sp, color = Color.LightGray)
+                        Text("—", fontSize = 12.sp, color = StitchOutlineVariant)
                     } else {
                         top.forEach { sv ->
                             val name = players.find { it.id == sv.element }?.webName ?: "Player ${sv.element}"
-                            Text("$name  ${sv.value}", fontSize = 12.sp, color = Color.DarkGray)
+                            Row(
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                modifier = Modifier.fillMaxWidth(0.9f)
+                            ) {
+                                Text(name, fontSize = 12.sp, color = StitchOnSurface, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                                Text(sv.value.toString(), fontSize = 12.sp, color = StitchSecondary, fontWeight = FontWeight.Bold)
+                            }
                         }
                     }
                 }
                 Spacer(Modifier.width(8.dp))
                 Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.End) {
-                    Text(awayTeamName, fontSize = 11.sp, color = Color.Gray, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.End)
+                    Text(
+                        awayTeamName.uppercase(),
+                        fontSize = 10.sp,
+                        color = StitchOutline,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.sp,
+                        textAlign = TextAlign.End
+                    )
                     Spacer(Modifier.height(4.dp))
                     val top = stat.a.sortedByDescending { it.value }.take(5)
                     if (top.isEmpty()) {
-                        Text("—", fontSize = 12.sp, color = Color.LightGray, textAlign = TextAlign.End)
+                        Text("—", fontSize = 12.sp, color = StitchOutlineVariant, textAlign = TextAlign.End)
                     } else {
                         top.forEach { sv ->
                             val name = players.find { it.id == sv.element }?.webName ?: "Player ${sv.element}"
-                            Text("$name  ${sv.value}", fontSize = 12.sp, color = Color.DarkGray, textAlign = TextAlign.End)
+                            Row(
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(sv.value.toString(), fontSize = 12.sp, color = StitchSecondary, fontWeight = FontWeight.Bold)
+                                Spacer(Modifier.width(4.dp))
+                                Text(name, fontSize = 12.sp, color = StitchOnSurface, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.End)
+                            }
                         }
                     }
                 }
@@ -972,37 +1833,80 @@ private fun BpsCard(
 // Reusable helpers
 // ─────────────────────────────────────────────────────────────
 
+// ─── Legacy aliases (kept for backward compat) ────────────────────────────────
 @Composable
-private fun SectionHeader(title: String) {
-    Text(
-        text = title,
-        fontSize = 15.sp,
-        fontWeight = FontWeight.Bold,
-        color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.padding(bottom = 4.dp)
+private fun SectionHeader(title: String) = StitchSectionHeader(title)
+
+@Composable
+private fun InfoCard(content: @Composable ColumnScope.() -> Unit) = StitchInfoCard(content)
+
+// ─── Stitch-styled helpers ────────────────────────────────────────────────────
+
+@Composable
+private fun StitchSectionHeader(title: String) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.padding(bottom = 2.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .width(3.dp)
+                .height(14.dp)
+                .clip(RoundedCornerShape(2.dp))
+                .background(StitchPrimary)
+        )
+        Spacer(Modifier.width(8.dp))
+        Text(
+            text = title.uppercase(),
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Bold,
+            color = StitchOutline,
+            letterSpacing = 2.sp
+        )
+    }
+}
+
+@Composable
+private fun StitchInfoCard(content: @Composable ColumnScope.() -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(StitchSurfaceHigh)
+            .padding(16.dp),
+        content = content
     )
 }
 
 @Composable
-private fun InfoCard(content: @Composable ColumnScope.() -> Unit) {
-    Card(
-        colors = CardDefaults.cardColors(containerColor = Color(0xFFF7F7F7)),
-        shape = RoundedCornerShape(10.dp),
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Column(modifier = Modifier.padding(12.dp), content = content)
-    }
-}
-
-@Composable
-fun InfoRow(label: String, value: String) {
+fun StitchInfoRow(
+    label: String,
+    value: String,
+    valueColor: Color = StitchOnSurface
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 3.dp),
-        horizontalArrangement = Arrangement.SpaceBetween
+            .padding(vertical = 4.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(label, color = Color.Gray, fontSize = 13.sp)
-        Text(value, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = Color(0xFF222222))
+        Text(
+            label,
+            color = StitchOutline,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Normal
+        )
+        Text(
+            value,
+            fontWeight = FontWeight.Bold,
+            fontSize = 12.sp,
+            color = valueColor
+        )
     }
 }
+
+// Needed by the external InfoRow call in MatchesScreen
+@Composable
+fun InfoRow(label: String, value: String, valueColor: Color = StitchOnSurface) =
+    StitchInfoRow(label, value, valueColor)

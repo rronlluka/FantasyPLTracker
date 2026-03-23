@@ -17,6 +17,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.PlatformTextStyle
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -282,7 +284,11 @@ fun PlayerCardOnPitch(
                     color = if (isCaptain) OnSecondary3C2F00 else Surface131313,
                     fontSize = badgeFont,
                     fontFamily = SpaceGrotesk,
-                    fontWeight = FontWeight.Black
+                    fontWeight = FontWeight.Black,
+                    textAlign = TextAlign.Center,
+                    style = TextStyle(
+                        platformStyle = PlatformTextStyle(includeFontPadding = false)
+                    )
                 )
             }
         }

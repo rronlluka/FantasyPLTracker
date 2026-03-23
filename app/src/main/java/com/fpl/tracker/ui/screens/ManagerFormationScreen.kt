@@ -1055,6 +1055,30 @@ fun TransfersDetailDialog(
                         .padding(20.dp),
                     verticalArrangement = Arrangement.spacedBy(20.dp)
                 ) {
+                    val isWildcardActive = activeChip == "wildcard"
+                    val isFreeHitActive = activeChip == "freehit"
+                    val transferModeLabel = when {
+                        isFreeHitActive -> "FREE HIT ACTIVE"
+                        isWildcardActive -> "ACTIVE WILDCARD"
+                        else -> "TRANSFER STATUS"
+                    }
+                    val transferModeValue = when {
+                        isFreeHitActive -> "UNLIMITED"
+                        isWildcardActive -> "ACTIVE"
+                        else -> "STANDARD"
+                    }
+                    val costLabel = if (isFreeHitActive) "TRANSFER LIMIT" else "COST"
+                    val costValue = when {
+                        isFreeHitActive -> "UNLIMITED"
+                        transferCost > 0 -> "-$transferCost PTS"
+                        else -> "FREE"
+                    }
+                    val costColor = when {
+                        isFreeHitActive -> PrimaryA1D494
+                        transferCost > 0 -> TertiaryFFB3AD
+                        else -> PrimaryA1D494
+                    }
+
                     // Summary bar
                     Row(
                         modifier = Modifier
@@ -1066,7 +1090,7 @@ fun TransfersDetailDialog(
                     ) {
                         Column {
                             Text(
-                                text = "ACTIVE WILDCARD",
+                                text = transferModeLabel,
                                 color = OnSurfaceVariantC2C9BB,
                                 fontSize = 10.sp,
                                 fontFamily = Manrope,
@@ -1074,7 +1098,7 @@ fun TransfersDetailDialog(
                                 letterSpacing = 2.sp
                             )
                             Text(
-                                text = if (activeChip == "wildcard") "ACTIVE" else "INACTIVE",
+                                text = transferModeValue,
                                 color = OnSurfaceE5E2E1,
                                 fontSize = 14.sp,
                                 fontFamily = SpaceGrotesk,
@@ -1083,7 +1107,7 @@ fun TransfersDetailDialog(
                         }
                         Column(horizontalAlignment = Alignment.End) {
                             Text(
-                                text = "COST",
+                                text = costLabel,
                                 color = OnSurfaceVariantC2C9BB,
                                 fontSize = 10.sp,
                                 fontFamily = Manrope,
@@ -1091,8 +1115,8 @@ fun TransfersDetailDialog(
                                 letterSpacing = 2.sp
                             )
                             Text(
-                                text = if (transferCost > 0) "-$transferCost PTS" else "FREE",
-                                color = if (transferCost > 0) TertiaryFFB3AD else PrimaryA1D494,
+                                text = costValue,
+                                color = costColor,
                                 fontSize = 14.sp,
                                 fontFamily = SpaceGrotesk,
                                 fontWeight = FontWeight.Bold
