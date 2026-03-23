@@ -75,51 +75,75 @@ fun MatchesScreen(
     val dropdownExpanded = remember { mutableStateOf(false) }
     val events = uiState.events
     val selectedEvent = events.firstOrNull { it.id == uiState.currentEvent }
+    val liveCount = uiState.fixtures.count {
+        it.started == true && !it.finished && !it.finishedProvisional
+    }
 
-    Scaffold(
-        containerColor = MaterialTheme.colorScheme.background
-    ) { padding ->
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(StitchBackground)
+    ) {
+        // ── Matchday Central Header ───────────────────────────────
         Column(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .background(MaterialTheme.colorScheme.background)
-                .padding(horizontal = 16.dp, vertical = 6.dp)
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 4.dp)
         ) {
+            Text(
+                text = "MATCHDAY CENTRAL",
+                fontSize = 10.sp,
+                fontWeight = FontWeight.ExtraBold,
+                color = StitchPrimary,
+                letterSpacing = 3.sp
+            )
+            Spacer(Modifier.height(4.dp))
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier.fillMaxWidth()
             ) {
+                // GW selector tap area
                 ExposedDropdownMenuBox(
                     expanded = dropdownExpanded.value,
                     onExpandedChange = { dropdownExpanded.value = !dropdownExpanded.value },
                     modifier = Modifier.weight(1f)
                 ) {
-                    TextField(
-                        value = selectedEvent?.name ?: "Gameweek ${uiState.currentEvent}",
-                        onValueChange = {},
-                        readOnly = true,
-                        label = { Text("Gameweek") },
-                        trailingIcon = {
-                            ExposedDropdownMenuDefaults.TrailingIcon(dropdownExpanded.value)
-                        },
-                        colors = TextFieldDefaults.colors(
-                            focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                            focusedIndicatorColor = Color.Transparent,
-                            unfocusedIndicatorColor = Color.Transparent,
-                            focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                            unfocusedTextColor = MaterialTheme.colorScheme.onSurface
-                        ),
-                        modifier = Modifier.menuAnchor()
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .menuAnchor()
+                            .clickable { dropdownExpanded.value = true }
+                    ) {
+                        Text(
+                            text = selectedEvent?.name ?: "GW ${uiState.currentEvent}",
+                            fontSize = 36.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = StitchOnSurface,
+                            letterSpacing = (-1).sp
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Icon(
+                            Icons.Default.Refresh,
+                            contentDescription = null,
+                            tint = StitchSecondary,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
                     ExposedDropdownMenu(
                         expanded = dropdownExpanded.value,
-                        onDismissRequest = { dropdownExpanded.value = false }
+                        onDismissRequest = { dropdownExpanded.value = false },
+                        containerColor = StitchSurfaceHigh
                     ) {
                         events.forEach { event ->
                             DropdownMenuItem(
-                                text = { Text(event.name) },
+                                text = {
+                                    Text(
+                                        event.name,
+                                        color = StitchOnSurface,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                },
                                 onClick = {
                                     dropdownExpanded.value = false
                                     viewModel.selectGameweek(event.id)
@@ -128,88 +152,116 @@ fun MatchesScreen(
                         }
                     }
                 }
-                IconButton(onClick = { viewModel.refreshFixtures() }) {
-                    Icon(
-                        Icons.Default.Refresh,
-                        contentDescription = "Refresh",
-                        tint = MaterialTheme.colorScheme.onSurface
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
-            ) {
-                when {
-                    uiState.isLoading -> {
-                        CircularProgressIndicator(
-                            modifier = Modifier.align(Alignment.Center),
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                    uiState.error != null -> {
-                        Column(
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (liveCount > 0) {
+                        Box(
                             modifier = Modifier
-                                .align(Alignment.Center)
-                                .padding(24.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(StitchSurface)
+                                .padding(horizontal = 12.dp, vertical = 6.dp)
                         ) {
-                            Text(
-                                text = "⚠️ Failed to load fixtures",
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                            Spacer(Modifier.height(8.dp))
-                            Text(
-                                text = uiState.error ?: "",
-                                fontSize = 13.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                textAlign = TextAlign.Center
-                            )
-                            Spacer(Modifier.height(16.dp))
-                            Button(
-                                onClick = { viewModel.refreshFixtures() },
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = MaterialTheme.colorScheme.primary
-                                )
-                            ) {
-                                Text("Retry", color = MaterialTheme.colorScheme.onPrimary)
-                            }
-                        }
-                    }
-                    uiState.fixtures.isNotEmpty() -> {
-                        LazyColumn(
-                            modifier = Modifier.fillMaxSize(),
-                            contentPadding = PaddingValues(bottom = 16.dp),
-                            verticalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            items(uiState.fixtures) { fixture ->
-                                FixtureCard(
-                                    fixture = fixture,
-                                    homeTeam = uiState.teams.find { it.id == fixture.teamH },
-                                    awayTeam = uiState.teams.find { it.id == fixture.teamA },
-                                    liveElements = uiState.liveElements,
-                                    onClick = { selectedFixture = fixture }
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                LiveDot(tint = StitchTertiary)
+                                Spacer(Modifier.width(6.dp))
+                                Text(
+                                    text = "$liveCount Live",
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = StitchOnSurface,
+                                    letterSpacing = 2.sp
                                 )
                             }
                         }
+                        Spacer(Modifier.width(8.dp))
                     }
-                    else -> {
-                        Text(
-                            "No fixtures found",
-                            modifier = Modifier.align(Alignment.Center),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                    IconButton(onClick = { viewModel.refreshFixtures() }) {
+                        Icon(
+                            Icons.Default.Refresh,
+                            contentDescription = "Refresh",
+                            tint = StitchOutline
                         )
                     }
                 }
             }
         }
+
+        HorizontalDivider(color = StitchOutlineVariant.copy(alpha = 0.3f))
+        Spacer(Modifier.height(8.dp))
+
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+        ) {
+            when {
+                uiState.isLoading -> {
+                    CircularProgressIndicator(
+                        modifier = Modifier.align(Alignment.Center),
+                        color = StitchPrimary
+                    )
+                }
+                uiState.error != null -> {
+                    Column(
+                        modifier = Modifier
+                            .align(Alignment.Center)
+                            .padding(24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = "⚠️ Failed to load fixtures",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = StitchPrimary
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            text = uiState.error ?: "",
+                            fontSize = 13.sp,
+                            color = StitchOnSurfaceVariant,
+                            textAlign = TextAlign.Center
+                        )
+                        Spacer(Modifier.height(16.dp))
+                        Button(
+                            onClick = { viewModel.refreshFixtures() },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = StitchPrimary
+                            )
+                        ) {
+                            Text("Retry", color = StitchOnPrimary)
+                        }
+                    }
+                }
+                uiState.fixtures.isNotEmpty() -> {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(
+                            start = 16.dp, end = 16.dp, bottom = 24.dp
+                        ),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        items(uiState.fixtures) { fixture ->
+                            FixtureCard(
+                                fixture = fixture,
+                                homeTeam = uiState.teams.find { it.id == fixture.teamH },
+                                awayTeam = uiState.teams.find { it.id == fixture.teamA },
+                                liveElements = uiState.liveElements,
+                                players = uiState.players,
+                                onClick = { selectedFixture = fixture }
+                            )
+                        }
+                    }
+                }
+                else -> {
+                    Text(
+                        "No fixtures found",
+                        modifier = Modifier.align(Alignment.Center),
+                        color = StitchOnSurfaceVariant
+                    )
+                }
+            }
+        }
     }
+
 
     selectedFixture?.let { fixture ->
         FixtureDetailDialog(
@@ -233,141 +285,376 @@ fun FixtureCard(
     homeTeam: Team?,
     awayTeam: Team?,
     liveElements: List<LiveElement>,
+    players: List<Player> = emptyList(),
     onClick: () -> Unit
 ) {
     val isLive = fixture.started == true && !fixture.finished && !fixture.finishedProvisional
     val isFinished = fixture.finished || fixture.finishedProvisional
+    val isHalfTime = isLive && fixture.minutes == 45
 
-    // For live games show live score from fixture (API updates scores directly)
     val homeScore = fixture.teamHScore
     val awayScore = fixture.teamAScore
+
+    // Goal scorers for footer
+    val goalsStat = fixture.stats?.find { it.identifier == "goals_scored" }
+    val ownGoalsStat = fixture.stats?.find { it.identifier == "own_goals" }
+    val homeGoalEntries = if (isLive || isFinished) buildGoalEntries(
+        scoringEntries = goalsStat?.h.orEmpty(),
+        ownGoalEntries = ownGoalsStat?.a.orEmpty(),
+        scoringTeamShort = homeTeam?.shortName ?: "H",
+        ownGoalTeamShort = awayTeam?.shortName ?: "A",
+        players = players
+    ) else emptyList()
+    val awayGoalEntries = if (isLive || isFinished) buildGoalEntries(
+        scoringEntries = goalsStat?.a.orEmpty(),
+        ownGoalEntries = ownGoalsStat?.h.orEmpty(),
+        scoringTeamShort = awayTeam?.shortName ?: "A",
+        ownGoalTeamShort = homeTeam?.shortName ?: "H",
+        players = players
+    ) else emptyList()
+    val hasGoals = homeGoalEntries.isNotEmpty() || awayGoalEntries.isNotEmpty()
 
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(containerColor = StitchSurface),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
-        // Coloured left accent stripe + optional LIVE banner
         Box(modifier = Modifier.fillMaxWidth()) {
-            // Left accent bar
+            // Top gradient accent bar (stadium-gradient style)
             Box(
                 modifier = Modifier
-                    .width(3.dp)
-                    .matchParentSize()
+                    .fillMaxWidth()
+                    .height(3.dp)
                     .background(
-                        when {
-                            isLive     -> StitchTertiaryContainer
-                            isFinished -> StitchPrimaryContainer
-                            else       -> StitchOutlineVariant
-                        }
+                        androidx.compose.ui.graphics.Brush.horizontalGradient(
+                            colors = when {
+                                isLive     -> listOf(StitchTertiary, StitchTertiaryContainer)
+                                isFinished -> listOf(StitchPrimary, StitchPrimaryContainer)
+                                else       -> listOf(StitchOutlineVariant, StitchOutlineVariant)
+                            }
+                        )
                     )
             )
 
-            Column(modifier = Modifier.fillMaxWidth()) {
-                // LIVE top pill banner
-                if (isLive) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(StitchTertiaryContainer)
-                            .padding(horizontal = 16.dp, vertical = 4.dp)
-                    ) {
-                        Row(
-                            Modifier.align(Alignment.Center),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            LiveDot(tint = Color.White)
-                            Spacer(Modifier.width(6.dp))
-                            Text(
-                                text = "LIVE · ${fixture.minutes}'",
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White,
-                                letterSpacing = 2.sp
-                            )
-                        }
-                    }
-                }
-
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 3.dp) // account for accent bar
+            ) {
+                // ── Status row ─────────────────────────────────────────
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(start = 20.dp, end = 16.dp, top = 16.dp, bottom = 16.dp),
+                        .padding(horizontal = 16.dp, vertical = 10.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Home team
-                    TeamBlock(
-                        name = homeTeam?.name ?: "Home",
-                        shortName = homeTeam?.shortName ?: "?",
-                        score = homeScore,
-                        showScore = isLive || isFinished,
-                        align = Alignment.Start,
-                        modifier = Modifier.weight(1.4f)
-                    )
-
-                    // Centre: score or kickoff
-                    Column(
-                        modifier = Modifier
-                            .weight(1f)
-                            .padding(horizontal = 4.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
+                    // Status label
+                    Row(verticalAlignment = Alignment.CenterVertically) {
                         when {
-                            isLive -> Text(
-                                text = "${homeScore ?: 0}  –  ${awayScore ?: 0}",
-                                fontSize = 24.sp,
-                                fontWeight = FontWeight.ExtraBold,
-                                color = StitchPrimary
-                            )
-                            isFinished -> {
-                                Text(
-                                    text = "${homeScore ?: 0}  –  ${awayScore ?: 0}",
-                                    fontSize = 24.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = StitchOnSurface
+                            isHalfTime -> {
+                                Icon(
+                                    Icons.Default.Refresh,
+                                    contentDescription = null,
+                                    tint = StitchSecondary,
+                                    modifier = Modifier.size(14.dp)
                                 )
+                                Spacer(Modifier.width(4.dp))
                                 Text(
-                                    text = "FT",
+                                    text = "HALF TIME",
                                     fontSize = 10.sp,
-                                    color = StitchOutline,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = StitchSecondary,
+                                    letterSpacing = 2.sp
+                                )
+                            }
+                            isLive -> {
+                                LiveDot(tint = StitchTertiary)
+                                Spacer(Modifier.width(4.dp))
+                                Text(
+                                    text = "LIVE - ${fixture.minutes}'",
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = StitchTertiary,
+                                    letterSpacing = 2.sp
+                                )
+                            }
+                            isFinished -> {
+                                Box(
+                                    modifier = Modifier
+                                        .size(8.dp)
+                                        .clip(CircleShape)
+                                        .background(StitchOutlineVariant)
+                                )
+                                Spacer(Modifier.width(4.dp))
+                                Text(
+                                    text = "FINAL RESULT",
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = StitchOnSurfaceVariant.copy(alpha = 0.6f),
                                     letterSpacing = 2.sp
                                 )
                             }
                             else -> {
-                                Text("vs", fontSize = 14.sp, color = StitchOutline)
+                                Icon(
+                                    Icons.Default.Refresh,
+                                    contentDescription = null,
+                                    tint = StitchSecondary,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                                Spacer(Modifier.width(4.dp))
                                 fixture.kickoffTime?.let { kt ->
+                                    val time = kt.substringAfter("T").take(5)
                                     Text(
-                                        text = kt.substringAfter("T").take(5),
-                                        fontSize = 12.sp,
+                                        text = "TODAY $time",
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.ExtraBold,
+                                        color = StitchSecondary,
+                                        letterSpacing = 2.sp
+                                    )
+                                } ?: Text(
+                                    text = "UPCOMING",
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = StitchSecondary,
+                                    letterSpacing = 2.sp
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // ── Teams + Score Row ───────────────────────────────────
+                if (isLive || isFinished) {
+                    // Compact layout with score in center and names inline
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 0.dp)
+                            .padding(bottom = 16.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Home
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.weight(5f)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(StitchSurfaceHighest),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = homeTeam?.shortName?.take(3) ?: "H",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = StitchOnSurfaceVariant
+                                )
+                            }
+                            Spacer(Modifier.width(10.dp))
+                            Text(
+                                text = homeTeam?.shortName ?: "Home",
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = StitchOnSurface,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                        // Score
+                        Row(
+                            modifier = Modifier.weight(3f),
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "${homeScore ?: 0}",
+                                fontSize = 28.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = if (isLive) StitchPrimary else StitchOnSurface,
+                                letterSpacing = (-1).sp
+                            )
+                            Text(
+                                text = "  -  ",
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = StitchOutlineVariant.copy(alpha = 0.5f)
+                            )
+                            Text(
+                                text = "${awayScore ?: 0}",
+                                fontSize = 28.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = if (isLive) StitchPrimary else StitchOnSurface,
+                                letterSpacing = (-1).sp
+                            )
+                        }
+                        // Away
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.End,
+                            modifier = Modifier.weight(5f)
+                        ) {
+                            Text(
+                                text = awayTeam?.shortName ?: "Away",
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = StitchOnSurface,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Spacer(Modifier.width(10.dp))
+                            Box(
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(StitchSurfaceHighest),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = awayTeam?.shortName?.take(3) ?: "A",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = StitchOnSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                } else {
+                    // Upcoming: big circular crests, VS in center
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 0.dp)
+                            .padding(bottom = 20.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(56.dp)
+                                    .clip(CircleShape)
+                                    .background(StitchSurfaceHighest),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = homeTeam?.shortName?.take(3) ?: "H",
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = StitchOnSurfaceVariant
+                                )
+                            }
+                            Spacer(Modifier.height(8.dp))
+                            Text(
+                                text = homeTeam?.shortName ?: "Home",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = StitchOnSurface
+                            )
+                        }
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(
+                                text = "VS",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = StitchOutlineVariant,
+                                letterSpacing = 4.sp
+                            )
+                        }
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(56.dp)
+                                    .clip(CircleShape)
+                                    .background(StitchSurfaceHighest),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = awayTeam?.shortName?.take(3) ?: "A",
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = StitchOnSurfaceVariant
+                                )
+                            }
+                            Spacer(Modifier.height(8.dp))
+                            Text(
+                                text = awayTeam?.shortName ?: "Away",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = StitchOnSurface
+                            )
+                        }
+                    }
+                }
+
+                // ── Goal scorers footer ─────────────────────────────────
+                if (hasGoals) {
+                    HorizontalDivider(color = StitchOutlineVariant.copy(alpha = 0.2f))
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 10.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        // Home scorers
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(3.dp)
+                        ) {
+                            homeGoalEntries.forEach { entry ->
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text("⚽", fontSize = 11.sp)
+                                    Spacer(Modifier.width(4.dp))
+                                    Text(
+                                        text = buildString {
+                                            append(entry.playerName)
+                                            if (entry.count > 1) append(" ×${entry.count}")
+                                            if (entry.isOwnGoal) append(" (og)")
+                                        },
+                                        fontSize = 11.sp,
                                         color = StitchOnSurfaceVariant,
-                                        fontWeight = FontWeight.SemiBold
+                                        fontWeight = FontWeight.Medium
                                     )
                                 }
                             }
                         }
-                    }
-
-                    // Away team
-                    TeamBlock(
-                        name = awayTeam?.name ?: "Away",
-                        shortName = awayTeam?.shortName ?: "?",
-                        score = awayScore,
-                        showScore = isLive || isFinished,
-                        align = Alignment.End,
-                        modifier = Modifier.weight(1.4f)
-                    )
-                }
-
-                // Goals summary footer
-                if ((isLive || isFinished) && fixture.stats != null) {
-                    val goals = fixture.stats.find { it.identifier == "goals_scored" }
-                    if (goals != null && (goals.h.isNotEmpty() || goals.a.isNotEmpty())) {
-                        HorizontalDivider(color = StitchOutlineVariant.copy(alpha = 0.4f))
-                        GoalsSummaryRow(goals.h, goals.a, fixture.stats, emptyList())
+                        // Away scorers (right aligned)
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            horizontalAlignment = Alignment.End,
+                            verticalArrangement = Arrangement.spacedBy(3.dp)
+                        ) {
+                            awayGoalEntries.forEach { entry ->
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(
+                                        text = buildString {
+                                            append(entry.playerName)
+                                            if (entry.count > 1) append(" ×${entry.count}")
+                                            if (entry.isOwnGoal) append(" (og)")
+                                        },
+                                        fontSize = 11.sp,
+                                        color = StitchOnSurfaceVariant,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                    Spacer(Modifier.width(4.dp))
+                                    Text("⚽", fontSize = 11.sp)
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -375,59 +662,7 @@ fun FixtureCard(
     }
 }
 
-@Composable
-private fun TeamBlock(
-    name: String,
-    shortName: String,
-    score: Int?,
-    showScore: Boolean,
-    align: Alignment.Horizontal,
-    modifier: Modifier = Modifier
-) {
-    Column(
-        modifier = modifier,
-        horizontalAlignment = align
-    ) {
-        Text(
-            text = name,
-            fontSize = 13.sp,
-            fontWeight = FontWeight.Bold,
-            color = StitchOnSurface,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
-        Text(
-            text = shortName,
-            fontSize = 10.sp,
-            fontWeight = FontWeight.SemiBold,
-            color = StitchOutline,
-            letterSpacing = 1.sp
-        )
-    }
-}
 
-@Composable
-private fun GoalsSummaryRow(
-    homeGoals: List<FixtureStatValue>,
-    awayGoals: List<FixtureStatValue>,
-    @Suppress("UNUSED_PARAMETER") stats: List<FixtureStat>?,
-    @Suppress("UNUSED_PARAMETER") players: List<Player>
-) {
-    // Simple row showing ⚽ count per side
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 6.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        val homeText = if (homeGoals.isNotEmpty()) homeGoals.joinToString("  ") { "⚽ ×${it.value}" } else "—"
-        val awayText = if (awayGoals.isNotEmpty()) awayGoals.joinToString("  ") { "⚽ ×${it.value}" } else "—"
-
-        Text(homeText, fontSize = 11.sp, color = StitchOnSurfaceVariant, modifier = Modifier.weight(1f))
-        Text(awayText, fontSize = 11.sp, color = StitchOnSurfaceVariant, textAlign = TextAlign.End, modifier = Modifier.weight(1f))
-    }
-}
 
 // ─────────────────────────────────────────────────────────────
 // Live pulsing dot
