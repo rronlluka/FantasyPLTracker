@@ -12,6 +12,8 @@ const TTL = {
   FIXTURES:         5  * 60,   // 5 min
   LIVE_ACTIVE:      60,        // 1 min  — during an active gameweek with live games
   LIVE_IDLE:        5  * 60,   // 5 min  — between gameweeks
+  STATS_ACTIVE:     2  * 60 * 60,   // 2 hr   — while the selected/current GW is live
+  STATS_IDLE:       24 * 60 * 60,   // 24 hr  — for finished/non-live GWs
   LEAGUE_STANDINGS: 2  * 60,   // 2 min
   PLAYER_DETAIL:    10 * 60,   // 10 min — historical stats, rarely changes
   MANAGER_DATA:     5  * 60,

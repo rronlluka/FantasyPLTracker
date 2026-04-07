@@ -173,9 +173,26 @@ router.get('/stats/overview', async (req, res) => {
 
   const cacheKey = `stats:overview:${requestedEvent ?? 'current'}`;
   try {
+    const { data: bootstrap } = await withCache('bootstrap', TTL.BOOTSTRAP, fpl.getBootstrap);
+    const resolvedEvent = requestedEvent == null
+      ? (
+        bootstrap.events.find((event) => event.is_current)
+        ?? bootstrap.events.find((event) => event.is_next)
+        ?? bootstrap.events[bootstrap.events.length - 1]
+      )
+      : (
+        bootstrap.events.find((event) => event.id === requestedEvent)
+        ?? bootstrap.events.find((event) => event.is_current)
+        ?? bootstrap.events.find((event) => event.is_next)
+        ?? bootstrap.events[bootstrap.events.length - 1]
+      );
+    const statsTtl = resolvedEvent?.is_current && !resolvedEvent?.finished
+      ? TTL.STATS_ACTIVE
+      : TTL.STATS_IDLE;
+
     const { data, fromCache } = await withCache(
       cacheKey,
-      2 * 60 * 60,
+      statsTtl,
       () => getStatsOverview(requestedEvent),
     );
     sendApiSuccess(res, data, { fromCache });
