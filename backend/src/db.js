@@ -6,6 +6,7 @@
  *   league_picks     – all managers' picks for a league+GW, stored once, used for every player query
  *   league_snapshots – metadata about a picks snapshot refresh for league+GW
  *   player_stats     – computed starts/bench/captain stats per league+GW+player
+ *   defcon_awards    – per-GW defensive contribution bonuses (+2) for season leaderboards
  */
 
 const { DatabaseSync } = require('node:sqlite');
@@ -71,6 +72,16 @@ db.exec(`
     computed_at        INTEGER NOT NULL,
     PRIMARY KEY (league_id, gameweek, player_id)
   );
+
+  CREATE TABLE IF NOT EXISTS defcon_awards (
+    event_id      INTEGER NOT NULL,
+    player_id     INTEGER NOT NULL,
+    element_type  INTEGER NOT NULL,
+    actions       INTEGER NOT NULL DEFAULT 0,
+    points        INTEGER NOT NULL DEFAULT 2,
+    computed_at   INTEGER NOT NULL,
+    PRIMARY KEY (event_id, player_id)
+  );
 `);
 
 const stmts = {
@@ -107,6 +118,22 @@ const stmts = {
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `),
   deletePlayerStats: db.prepare('DELETE FROM player_stats WHERE league_id = ? AND gameweek = ?'),
+
+  getDefConAwardsForEvent: db.prepare('SELECT * FROM defcon_awards WHERE event_id = ?'),
+  countDefConAwardsForEvent: db.prepare('SELECT COUNT(*) as cnt FROM defcon_awards WHERE event_id = ?'),
+  upsertDefConAward: db.prepare(`
+    INSERT OR REPLACE INTO defcon_awards
+      (event_id, player_id, element_type, actions, points, computed_at)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `),
+  deleteDefConAwardsForEvent: db.prepare('DELETE FROM defcon_awards WHERE event_id = ?'),
+  getDefConCountsThroughEvent: db.prepare(`
+    SELECT player_id, element_type, COUNT(*) as defcon_count, MAX(actions) as best_actions
+    FROM defcon_awards
+    WHERE event_id <= ? AND element_type = ?
+    GROUP BY player_id, element_type
+    ORDER BY defcon_count DESC, best_actions DESC, player_id ASC
+  `),
 };
 
 function cacheGet(key) {
@@ -258,6 +285,40 @@ function savePlayerStats(leagueId, gameweek, stats) {
   );
 }
 
+function countDefConAwardsForEvent(eventId) {
+  return stmts.countDefConAwardsForEvent.get(eventId)?.cnt ?? 0;
+}
+
+function getDefConAwardsForEvent(eventId) {
+  return stmts.getDefConAwardsForEvent.all(eventId);
+}
+
+function saveDefConAwards(eventId, awards) {
+  const now = Math.floor(Date.now() / 1000);
+  db.exec('BEGIN');
+  try {
+    stmts.deleteDefConAwardsForEvent.run(eventId);
+    for (const award of awards) {
+      stmts.upsertDefConAward.run(
+        eventId,
+        award.playerId,
+        award.elementType,
+        award.actions ?? 0,
+        award.points ?? 2,
+        now
+      );
+    }
+    db.exec('COMMIT');
+  } catch (err) {
+    db.exec('ROLLBACK');
+    throw err;
+  }
+}
+
+function getDefConCountsThroughEvent(eventId, elementType) {
+  return stmts.getDefConCountsThroughEvent.all(eventId, elementType);
+}
+
 function getDbInfo() {
   const tables = db.prepare(`
     SELECT name FROM sqlite_master WHERE type='table' ORDER BY name
@@ -288,5 +349,9 @@ module.exports = {
   saveLeaguePicks,
   getPlayerStats,
   savePlayerStats,
+  countDefConAwardsForEvent,
+  getDefConAwardsForEvent,
+  saveDefConAwards,
+  getDefConCountsThroughEvent,
   getDbInfo,
 };

@@ -14,6 +14,7 @@ const fpl = require('../fpl');
 const { TTL, withCache } = require('../cache');
 const { ensureLeaguePicks, computePlayerStats } = require('../leaguePicks');
 const { getLeagueSnapshot, countLeaguePicks } = require('../storage');
+const { getStatsOverview } = require('../statsOverview');
 const { sendApiSuccess, sendApiError } = require('../response');
 
 // ── Bootstrap ─────────────────────────────────────────────────────────────────
@@ -159,6 +160,28 @@ router.get('/element-summary/:elementId/', async (req, res) => {
   } catch (err) {
     console.error('[player detail]', err.message);
     sendApiError(res, 502, 'player_detail_failed', err.message);
+  }
+});
+
+// ── Stats overview ────────────────────────────────────────────────────────────
+// GET /api/stats/overview?event=31
+router.get('/stats/overview', async (req, res) => {
+  const requestedEvent = req.query.event ? parseInt(req.query.event) : null;
+  if (req.query.event && Number.isNaN(requestedEvent)) {
+    return sendApiError(res, 400, 'invalid_params', 'Invalid event query parameter');
+  }
+
+  const cacheKey = `stats:overview:${requestedEvent ?? 'current'}`;
+  try {
+    const { data, fromCache } = await withCache(
+      cacheKey,
+      2 * 60 * 60,
+      () => getStatsOverview(requestedEvent),
+    );
+    sendApiSuccess(res, data, { fromCache });
+  } catch (err) {
+    console.error('[stats overview]', err.message);
+    sendApiError(res, 502, 'stats_overview_failed', err.message);
   }
 });
 

@@ -15,5 +15,9 @@ module.exports = {
   saveLeaguePicks: db.saveLeaguePicks,
   getPlayerStats: db.getPlayerStats,
   savePlayerStats: db.savePlayerStats,
+  countDefConAwardsForEvent: db.countDefConAwardsForEvent,
+  getDefConAwardsForEvent: db.getDefConAwardsForEvent,
+  saveDefConAwards: db.saveDefConAwards,
+  getDefConCountsThroughEvent: db.getDefConCountsThroughEvent,
   getDbInfo: db.getDbInfo,
 };

@@ -1,11 +1,12 @@
 import React, { type ReactNode, useEffect, useMemo, useRef } from 'react';
+import { View } from 'react-native';
 import type { StyleProp, ViewStyle } from 'react-native';
 import {
   BottomSheetBackdrop,
   BottomSheetModal,
-  BottomSheetView,
   type BottomSheetDefaultBackdropProps,
 } from '@gorhom/bottom-sheet';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '@/constants/theme';
 
 type AppBottomSheetProps = {
@@ -28,6 +29,7 @@ export function AppBottomSheet({
   stackBehavior,
 }: AppBottomSheetProps) {
   const modalRef = useRef<BottomSheetModal>(null);
+  const insets = useSafeAreaInsets();
   const resolvedSnapPoints = useMemo(() => snapPoints, [snapPoints]);
 
   useEffect(() => {
@@ -54,6 +56,8 @@ export function AppBottomSheet({
       ref={modalRef}
       index={0}
       snapPoints={resolvedSnapPoints}
+      enableDynamicSizing={false}
+      topInset={insets.top}
       enablePanDownToClose
       onDismiss={onClose}
       stackBehavior={stackBehavior}
@@ -72,9 +76,9 @@ export function AppBottomSheet({
         backgroundStyle,
       ]}
     >
-      <BottomSheetView style={[{ flex: 1 }, contentContainerStyle]}>
+      <View style={[{ flex: 1, minHeight: 0 }, contentContainerStyle]}>
         {children}
-      </BottomSheetView>
+      </View>
     </BottomSheetModal>
   );
 }

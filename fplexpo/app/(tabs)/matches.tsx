@@ -7,6 +7,7 @@ import {
   View, Text, FlatList, TouchableOpacity, ActivityIndicator,
   StyleSheet, RefreshControl, ScrollView,
 } from 'react-native';
+import { BottomSheetScrollView, BottomSheetFlatList } from '@gorhom/bottom-sheet';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Api } from '@/services/api';
 import {
@@ -32,7 +33,7 @@ type GoalEntry = {
   isPenalty: boolean;
 };
 
-type MatchDialogPlayer = {
+export type MatchDialogPlayer = {
   player: Player;
   teamInfo?: Team;
   teamShortName: string;
@@ -281,9 +282,10 @@ export default function MatchesScreen() {
         <View style={styles.gwModalContent}>
           <View style={styles.gwModal}>
             <Text style={styles.gwModalTitle}>Select Gameweek</Text>
-            <FlatList
+            <BottomSheetFlatList
               data={events}
               keyExtractor={(e) => String(e.id)}
+              style={{ flex: 1 }}
               renderItem={({ item }) => (
                 <TouchableOpacity
                   style={[styles.gwModalItem, item.id === currentEventId && styles.gwModalItemActive]}
@@ -304,31 +306,30 @@ export default function MatchesScreen() {
         </View>
       </AppBottomSheet>
 
-      {/* ── Fixture stats modal ───────────────────────────────────── */}
-      {selectedFixture && (
-        <FixtureStatsModal
-          fixture={selectedFixture}
-          teams={teams}
-          players={players}
-          liveMap={liveMap}
-          onPlayerPress={handlePlayerPress}
-          onClose={() => setSelectedFixture(null)}
-        />
-      )}
+      {/* ── Fixture stats modal ── always in tree so BottomSheetModal stays registered ── */}
+      <FixtureStatsModal
+        visible={selectedFixture !== null}
+        fixture={selectedFixture}
+        teams={teams}
+        players={players}
+        liveMap={liveMap}
+        onPlayerPress={handlePlayerPress}
+        onClose={() => setSelectedFixture(null)}
+      />
 
-      {selectedPlayer && bootstrapData && (
-        <PlayerLeagueModal
-          player={selectedPlayer}
-          detail={playerDetail}
-          bootstrapData={bootstrapData}
-          leagueStats={leagueStats}
-          leagueStatsError={leagueStatsError}
-          isLoadingLeagueStats={isLoadingPlayerData}
-          currentEvent={currentEventId}
-          selectedLeagueName={favoriteLeagueName}
-          onClose={() => setSelectedPlayer(null)}
-        />
-      )}
+      {/* ── Player league modal ── same pattern ── */}
+      <PlayerLeagueModal
+        visible={selectedPlayer !== null && bootstrapData !== null}
+        player={selectedPlayer}
+        detail={playerDetail}
+        bootstrapData={bootstrapData}
+        leagueStats={leagueStats}
+        leagueStatsError={leagueStatsError}
+        isLoadingLeagueStats={isLoadingPlayerData}
+        currentEvent={currentEventId}
+        selectedLeagueName={favoriteLeagueName}
+        onClose={() => setSelectedPlayer(null)}
+      />
     </View>
   );
 }
@@ -469,6 +470,7 @@ function FixtureCard({
 
 // ── FixtureStatsModal ─────────────────────────────────────────────────────────
 function FixtureStatsModal({
+  visible,
   fixture,
   teams,
   players,
@@ -476,15 +478,17 @@ function FixtureStatsModal({
   onPlayerPress,
   onClose,
 }: {
-  fixture: Fixture;
+  visible: boolean;
+  fixture: Fixture | null;
   teams: Team[];
   players: Player[];
   liveMap: Map<number, LiveElement>;
   onPlayerPress: (player: Player, fixture: Fixture) => void;
   onClose: () => void;
 }) {
-  const homeTeam = teams.find((t) => t.id === fixture.team_h);
-  const awayTeam = teams.find((t) => t.id === fixture.team_a);
+  const insets = useSafeAreaInsets();
+  const homeTeam = fixture ? teams.find((t) => t.id === fixture.team_h) : undefined;
+  const awayTeam = fixture ? teams.find((t) => t.id === fixture.team_a) : undefined;
   const getPlayerName = (id: number) =>
     players.find((p) => p.id === id)?.web_name ?? `#${id}`;
 
@@ -500,116 +504,130 @@ function FixtureStatsModal({
     bonus: 'Bonus',
   };
 
-  const activeStats = fixture.stats.filter((s) => s.h.length > 0 || s.a.length > 0);
+  const activeStats = fixture ? fixture.stats.filter((s) => s.h.length > 0 || s.a.length > 0) : [];
 
   return (
     <AppBottomSheet
-      visible
+      visible={visible}
       onClose={onClose}
-      snapPoints={['82%']}
+      snapPoints={['97%']}
       backgroundStyle={{ backgroundColor: Colors.surface }}
     >
       <View style={modalStyles.sheet}>
-        <View style={modalStyles.header}>
-          <Text style={modalStyles.teamH}>{homeTeam?.short_name ?? '?'}</Text>
-          <Text style={modalStyles.score}>
-            {fixture.team_h_score ?? 0} – {fixture.team_a_score ?? 0}
-          </Text>
-          <Text style={modalStyles.teamA}>{awayTeam?.short_name ?? '?'}</Text>
-        </View>
+        {fixture && (
+          <TouchableOpacity style={modalStyles.closeBtn} onPress={onClose}>
+            <Text style={modalStyles.closeBtnText}>✕</Text>
+          </TouchableOpacity>
+        )}
 
-        <View style={modalStyles.difficultyRow}>
-          <View style={modalStyles.difficultySide}>
-            <Text style={modalStyles.difficultyLabel}>{homeTeam?.short_name ?? 'HOME'} Difficulty</Text>
-            <View
-              style={[
-                modalStyles.difficultyPill,
-                { backgroundColor: getDifficultyTheme(fixture.team_h_difficulty).backgroundColor },
-              ]}
-            >
-              <Text
-                style={[
-                  modalStyles.difficultyValue,
-                  { color: getDifficultyTheme(fixture.team_h_difficulty).color },
-                ]}
-              >
-                {fixture.team_h_difficulty}
-              </Text>
-            </View>
-          </View>
-          <View style={[modalStyles.difficultySide, modalStyles.difficultySideRight]}>
-            <Text style={[modalStyles.difficultyLabel, { textAlign: 'right' }]}>
-              {awayTeam?.short_name ?? 'AWAY'} Difficulty
-            </Text>
-            <View
-              style={[
-                modalStyles.difficultyPill,
-                modalStyles.difficultyPillRight,
-                { backgroundColor: getDifficultyTheme(fixture.team_a_difficulty).backgroundColor },
-              ]}
-            >
-              <Text
-                style={[
-                  modalStyles.difficultyValue,
-                  { color: getDifficultyTheme(fixture.team_a_difficulty).color },
-                ]}
-              >
-                {fixture.team_a_difficulty}
-              </Text>
-            </View>
-          </View>
-        </View>
-
-        <TouchableOpacity style={modalStyles.closeBtn} onPress={onClose}>
-          <Text style={modalStyles.closeBtnText}>✕</Text>
-        </TouchableOpacity>
-
-        <ScrollView showsVerticalScrollIndicator={false}>
-          {activeStats.length === 0 ? (
-            <Text style={modalStyles.noStats}>No stats available yet</Text>
-          ) : (
-            activeStats.map((stat) => (
-              <View key={stat.identifier} style={modalStyles.statSection}>
-                <Text style={modalStyles.statLabel}>
-                  {statLabels[stat.identifier] ?? stat.identifier}
+        <BottomSheetFlatList
+          data={fixture ? activeStats : []}
+          keyExtractor={(item) => item.identifier}
+          style={modalStyles.scroll}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={[modalStyles.scrollContent, { paddingBottom: insets.bottom + 48 }]}
+          ListHeaderComponent={fixture ? (
+            <>
+              <View style={modalStyles.header}>
+                <Text style={modalStyles.teamH}>{homeTeam?.short_name ?? '?'}</Text>
+                <Text style={modalStyles.score}>
+                  {fixture.team_h_score ?? 0} – {fixture.team_a_score ?? 0}
                 </Text>
-                <View style={modalStyles.statColumns}>
-                  <View style={modalStyles.statCol}>
-                    {stat.h.map((sv, i) => (
-                      <TouchableOpacity
-                        key={i}
-                        onPress={() => {
-                          const player = players.find((item) => item.id === sv.element);
-                          if (player) onPlayerPress(player, fixture);
-                        }}
-                      >
-                        <Text style={modalStyles.statPlayer}>
-                          {getPlayerName(sv.element)} {sv.value > 1 ? `×${sv.value}` : ''}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
+                <Text style={modalStyles.teamA}>{awayTeam?.short_name ?? '?'}</Text>
+              </View>
+
+              <View style={modalStyles.difficultyRow}>
+                <View style={modalStyles.difficultySide}>
+                  <Text style={modalStyles.difficultyLabel}>{homeTeam?.short_name ?? 'HOME'} Difficulty</Text>
+                  <View
+                    style={[
+                      modalStyles.difficultyPill,
+                      { backgroundColor: getDifficultyTheme(fixture.team_h_difficulty).backgroundColor },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        modalStyles.difficultyValue,
+                        { color: getDifficultyTheme(fixture.team_h_difficulty).color },
+                      ]}
+                    >
+                      {fixture.team_h_difficulty}
+                    </Text>
                   </View>
-                  <View style={modalStyles.statCol}>
-                    {stat.a.map((sv, i) => (
-                      <TouchableOpacity
-                        key={i}
-                        onPress={() => {
-                          const player = players.find((item) => item.id === sv.element);
-                          if (player) onPlayerPress(player, fixture);
-                        }}
-                      >
-                        <Text key={i} style={[modalStyles.statPlayer, { textAlign: 'right' }]}>
-                          {sv.value > 1 ? `×${sv.value} ` : ''}{getPlayerName(sv.element)}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
+                </View>
+                <View style={[modalStyles.difficultySide, modalStyles.difficultySideRight]}>
+                  <Text style={[modalStyles.difficultyLabel, { textAlign: 'right' }]}>
+                    {awayTeam?.short_name ?? 'AWAY'} Difficulty
+                  </Text>
+                  <View
+                    style={[
+                      modalStyles.difficultyPill,
+                      modalStyles.difficultyPillRight,
+                      { backgroundColor: getDifficultyTheme(fixture.team_a_difficulty).backgroundColor },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        modalStyles.difficultyValue,
+                        { color: getDifficultyTheme(fixture.team_a_difficulty).color },
+                      ]}
+                    >
+                      {fixture.team_a_difficulty}
+                    </Text>
                   </View>
                 </View>
               </View>
-            ))
+              {activeStats.length === 0 && <Text style={modalStyles.noStats}>No stats available yet</Text>}
+            </>
+          ) : null}
+          renderItem={({ item: stat }) => (
+            <View style={modalStyles.statSection}>
+              <Text style={modalStyles.statLabel}>
+                {statLabels[stat.identifier] ?? stat.identifier}
+              </Text>
+              <View style={modalStyles.statColumns}>
+                <View style={modalStyles.statCol}>
+                  {stat.h.map((sv, i) => (
+                    <TouchableOpacity
+                      key={i}
+                      onPress={() => {
+                        const player = players.find((entry) => entry.id === sv.element);
+                        if (player && fixture) onPlayerPress(player, fixture);
+                      }}
+                    >
+                      <Text style={modalStyles.statPlayer}>
+                        {getPlayerName(sv.element)} {sv.value > 1 ? `×${sv.value}` : ''}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+                <View style={modalStyles.statCol}>
+                  {stat.a.map((sv, i) => (
+                    <TouchableOpacity
+                      key={i}
+                      onPress={() => {
+                        const player = players.find((entry) => entry.id === sv.element);
+                        if (player && fixture) onPlayerPress(player, fixture);
+                      }}
+                    >
+                      <Text style={[modalStyles.statPlayer, { textAlign: 'right' }]}>
+                        {sv.value > 1 ? `×${sv.value} ` : ''}{getPlayerName(sv.element)}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            </View>
           )}
-          <View style={{ height: 24 }} />
-        </ScrollView>
+          ListFooterComponent={!fixture ? null : (
+            <>
+              <TouchableOpacity style={modalStyles.cancelAction} onPress={onClose} activeOpacity={0.9}>
+                <Text style={modalStyles.cancelActionText}>CANCEL</Text>
+              </TouchableOpacity>
+              <View style={modalStyles.bottomSpacer} />
+            </>
+          )}
+        />
       </View>
     </AppBottomSheet>
   );
@@ -667,7 +685,8 @@ function sortManagers(managers: LeagueManagerRef[] = []): LeagueManagerRef[] {
   return [...managers].sort((a, b) => a.rank - b.rank || a.entryName.localeCompare(b.entryName));
 }
 
-function PlayerLeagueModal({
+export function PlayerLeagueModal({
+  visible = true,
   player,
   detail,
   bootstrapData,
@@ -677,26 +696,36 @@ function PlayerLeagueModal({
   currentEvent,
   selectedLeagueName,
   onClose,
+  variant = 'default',
 }: {
-  player: MatchDialogPlayer;
+  visible?: boolean;
+  player: MatchDialogPlayer | null;
   detail: PlayerDetailResponse | null;
-  bootstrapData: BootstrapData;
+  bootstrapData: BootstrapData | null;
   leagueStats: BackendLeaguePlayerStats | null;
   leagueStatsError: string | null;
   isLoadingLeagueStats: boolean;
   currentEvent: number;
   selectedLeagueName: string | null;
   onClose: () => void;
+  variant?: 'default' | 'stats';
 }) {
-  const [selectedTab, setSelectedTab] = useState<'summary' | 'starts' | 'bench'>('summary');
+  const insets = useSafeAreaInsets();
+  const [selectedTab, setSelectedTab] = useState<'summary' | 'season_log' | 'starts' | 'bench'>('summary');
   const [showAllPrevious, setShowAllPrevious] = useState(false);
   const [showAllUpcoming, setShowAllUpcoming] = useState(false);
+
+  const playerId = player?.player?.id;
 
   useEffect(() => {
     setSelectedTab('summary');
     setShowAllPrevious(false);
     setShowAllUpcoming(false);
-  }, [player.player.id]);
+  }, [playerId]);
+
+  if (!player) {
+    return null;
+  }
 
   const team = player.teamInfo;
   const teamShortName = team?.short_name ?? player.teamShortName;
@@ -718,16 +747,107 @@ function PlayerLeagueModal({
     leagueStats?.startedBy.filter((manager) => !captainedBy.some((captained) => captained.rank === manager.rank && captained.entryName === manager.entryName)) ?? [],
   );
   const benchedBy = sortManagers(leagueStats?.benchedBy);
+  const isStatsVariant = variant === 'stats';
   const leagueLabel = selectedLeagueName ?? 'your favorite league';
   const displayMinutes = player.fixture && player.fixture.started === true && !player.fixture.finished
     ? player.fixture.minutes
     : (selectedHistory?.minutes ?? 0);
+  const seasonHistory = [...(detail?.history ?? [])].sort((a, b) => b.round - a.round);
+  const seasonTotals = seasonHistory.reduce((acc, row) => ({
+    totalPoints: acc.totalPoints + row.total_points,
+    minutes: acc.minutes + row.minutes,
+    goals: acc.goals + row.goals_scored,
+    assists: acc.assists + row.assists,
+    cleanSheets: acc.cleanSheets + row.clean_sheets,
+    defCon: acc.defCon + Number(row.defensive_contribution ?? 0),
+    xg: acc.xg + (Number.parseFloat(row.expected_goals ?? '0') || 0),
+    xa: acc.xa + (Number.parseFloat(row.expected_assists ?? '0') || 0),
+    xgc: acc.xgc + (Number.parseFloat(row.expected_goals_conceded ?? '0') || 0),
+  }), {
+    totalPoints: 0,
+    minutes: 0,
+    goals: 0,
+    assists: 0,
+    cleanSheets: 0,
+    defCon: 0,
+    xg: 0,
+    xa: 0,
+    xgc: 0,
+  });
+  const seasonLogRows = seasonHistory.map((match) => ({
+    key: `${match.fixture}-${match.round}`,
+    gw: String(match.round),
+    opp: `${bootstrapData.teams.find((entry) => entry.id === match.opponent_team)?.short_name ?? 'OPP'} ${match.was_home ? '(H)' : '(A)'}`,
+    min: match.minutes > 0 ? String(match.minutes) : '–',
+    pts: String(match.total_points),
+    g: String(match.goals_scored),
+    a: String(match.assists),
+    c: String(match.clean_sheets),
+    dc: String(match.defensive_contribution ?? 0),
+    xg: (Number.parseFloat(match.expected_goals ?? '0') || 0).toFixed(2),
+    xa: (Number.parseFloat(match.expected_assists ?? '0') || 0).toFixed(2),
+    xc: (Number.parseFloat(match.expected_goals_conceded ?? '0') || 0).toFixed(2),
+  }));
+  const seasonLogContent = (
+    <>
+      <View style={playerModalStyles.sectionCard}>
+        <Text style={playerModalStyles.sectionTitle}>SEASON MATCH LOG</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          <View style={playerModalStyles.seasonTable}>
+            <View style={playerModalStyles.seasonHeaderRow}>
+              <Text style={[playerModalStyles.seasonHeaderCell, playerModalStyles.seasonGw]}>GW</Text>
+              <Text style={[playerModalStyles.seasonHeaderCell, playerModalStyles.seasonOpp]}>Opp</Text>
+              <Text style={[playerModalStyles.seasonHeaderCell, playerModalStyles.seasonStat]}>Min</Text>
+              <Text style={[playerModalStyles.seasonHeaderCell, playerModalStyles.seasonStat]}>Pts</Text>
+              <Text style={[playerModalStyles.seasonHeaderCell, playerModalStyles.seasonMini]}>G</Text>
+              <Text style={[playerModalStyles.seasonHeaderCell, playerModalStyles.seasonMini]}>A</Text>
+              <Text style={[playerModalStyles.seasonHeaderCell, playerModalStyles.seasonMini]}>C</Text>
+              <Text style={[playerModalStyles.seasonHeaderCell, playerModalStyles.seasonMini]}>DC</Text>
+              <Text style={[playerModalStyles.seasonHeaderCell, playerModalStyles.seasonExpected]}>xG</Text>
+              <Text style={[playerModalStyles.seasonHeaderCell, playerModalStyles.seasonExpected]}>xA</Text>
+              <Text style={[playerModalStyles.seasonHeaderCell, playerModalStyles.seasonExpected]}>xC</Text>
+            </View>
+            <View style={playerModalStyles.tableDivider} />
+            {seasonLogRows.map((row) => (
+              <View key={row.key} style={playerModalStyles.seasonRow}>
+                <Text style={[playerModalStyles.seasonCell, playerModalStyles.seasonGw]}>{row.gw}</Text>
+                <Text style={[playerModalStyles.seasonCell, playerModalStyles.seasonOpp]}>{row.opp}</Text>
+                <Text style={[playerModalStyles.seasonCell, playerModalStyles.seasonStat]}>{row.min}</Text>
+                <Text style={[playerModalStyles.seasonCell, playerModalStyles.seasonStat, playerModalStyles.seasonPoints]}>{row.pts}</Text>
+                <Text style={[playerModalStyles.seasonCell, playerModalStyles.seasonMini]}>{row.g}</Text>
+                <Text style={[playerModalStyles.seasonCell, playerModalStyles.seasonMini]}>{row.a}</Text>
+                <Text style={[playerModalStyles.seasonCell, playerModalStyles.seasonMini]}>{row.c}</Text>
+                <Text style={[playerModalStyles.seasonCell, playerModalStyles.seasonMini]}>{row.dc}</Text>
+                <Text style={[playerModalStyles.seasonCell, playerModalStyles.seasonExpected]}>{row.xg}</Text>
+                <Text style={[playerModalStyles.seasonCell, playerModalStyles.seasonExpected]}>{row.xa}</Text>
+                <Text style={[playerModalStyles.seasonCell, playerModalStyles.seasonExpected]}>{row.xc}</Text>
+              </View>
+            ))}
+            <View style={playerModalStyles.tableDivider} />
+            <View style={playerModalStyles.seasonRow}>
+              <Text style={[playerModalStyles.seasonCell, playerModalStyles.seasonGw, playerModalStyles.seasonFooterLabel]}>Total</Text>
+              <Text style={[playerModalStyles.seasonCell, playerModalStyles.seasonOpp]}>Season</Text>
+              <Text style={[playerModalStyles.seasonCell, playerModalStyles.seasonStat]}>{seasonTotals.minutes}</Text>
+              <Text style={[playerModalStyles.seasonCell, playerModalStyles.seasonStat, playerModalStyles.seasonPoints]}>{seasonTotals.totalPoints}</Text>
+              <Text style={[playerModalStyles.seasonCell, playerModalStyles.seasonMini]}>{seasonTotals.goals}</Text>
+              <Text style={[playerModalStyles.seasonCell, playerModalStyles.seasonMini]}>{seasonTotals.assists}</Text>
+              <Text style={[playerModalStyles.seasonCell, playerModalStyles.seasonMini]}>{seasonTotals.cleanSheets}</Text>
+              <Text style={[playerModalStyles.seasonCell, playerModalStyles.seasonMini]}>{seasonTotals.defCon}</Text>
+              <Text style={[playerModalStyles.seasonCell, playerModalStyles.seasonExpected]}>{seasonTotals.xg.toFixed(2)}</Text>
+              <Text style={[playerModalStyles.seasonCell, playerModalStyles.seasonExpected]}>{seasonTotals.xa.toFixed(2)}</Text>
+              <Text style={[playerModalStyles.seasonCell, playerModalStyles.seasonExpected]}>{seasonTotals.xgc.toFixed(2)}</Text>
+            </View>
+          </View>
+        </ScrollView>
+      </View>
+    </>
+  );
 
   return (
     <AppBottomSheet
       visible
       onClose={onClose}
-      snapPoints={['92%']}
+      snapPoints={['97%']}
       stackBehavior="push"
     >
       <View style={playerModalStyles.sheet}>
@@ -747,19 +867,32 @@ function PlayerLeagueModal({
           </TouchableOpacity>
         </View>
 
-        <View style={playerModalStyles.tabRow}>
-          {(['summary', 'starts', 'bench'] as const).map((tab) => (
-            <TouchableOpacity key={tab} style={playerModalStyles.tabButton} onPress={() => setSelectedTab(tab)}>
-              <Text style={[playerModalStyles.tabLabel, selectedTab === tab && playerModalStyles.tabLabelActive]}>
-                {tab === 'summary' ? 'Summary' : tab === 'starts' ? `Starts${leagueStats ? ` (${leagueStats.startsCount})` : ''}` : `Bench${leagueStats ? ` (${leagueStats.benchCount})` : ''}`}
-              </Text>
-              <View style={[playerModalStyles.tabIndicator, selectedTab === tab && playerModalStyles.tabIndicatorActive]} />
-            </TouchableOpacity>
-          ))}
-        </View>
+        {!isStatsVariant && (
+          <View style={playerModalStyles.tabRow}>
+            {(['summary', 'starts', 'bench', 'season_log'] as const).map((tab) => (
+              <TouchableOpacity key={tab} style={playerModalStyles.tabButton} onPress={() => setSelectedTab(tab)}>
+                <Text style={[playerModalStyles.tabLabel, selectedTab === tab && playerModalStyles.tabLabelActive]}>
+                  {tab === 'summary'
+                    ? 'Summary'
+                    : tab === 'starts'
+                        ? `Starts${leagueStats ? ` (${leagueStats.startsCount})` : ''}`
+                        : tab === 'bench'
+                          ? `Bench${leagueStats ? ` (${leagueStats.benchCount})` : ''}`
+                          : 'Season Log'}
+                </Text>
+                <View style={[playerModalStyles.tabIndicator, selectedTab === tab && playerModalStyles.tabIndicatorActive]} />
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
 
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={playerModalStyles.scrollContent}>
-          {selectedTab === 'summary' && (
+        <BottomSheetScrollView
+          style={playerModalStyles.scroll}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={[playerModalStyles.scrollContent, { paddingBottom: insets.bottom + 48 }]}
+        >
+          {(isStatsVariant || selectedTab === 'summary') && (
+            isStatsVariant ? seasonLogContent : (
             <>
               <View style={playerModalStyles.infoCard}>
                 <Text style={playerModalStyles.infoText}>
@@ -830,8 +963,10 @@ function PlayerLeagueModal({
                 />
               )}
             </>
+            )
           )}
-          {selectedTab === 'starts' && (
+          {!isStatsVariant && selectedTab === 'season_log' && seasonLogContent}
+          {!isStatsVariant && selectedTab === 'starts' && (
             <ManagerListTab
               title="TEAMS WHO STARTED THIS PLAYER"
               managers={startedBy}
@@ -840,7 +975,7 @@ function PlayerLeagueModal({
               isLoading={isLoadingLeagueStats}
             />
           )}
-          {selectedTab === 'bench' && (
+          {!isStatsVariant && selectedTab === 'bench' && (
             <BenchListTab
               managers={benchedBy}
               benchCount={leagueStats?.benchCount ?? 0}
@@ -848,11 +983,11 @@ function PlayerLeagueModal({
               isLoading={isLoadingLeagueStats}
             />
           )}
-        </ScrollView>
-
-        <TouchableOpacity style={playerModalStyles.closeAction} onPress={onClose}>
-          <Text style={playerModalStyles.closeActionText}>CLOSE</Text>
-        </TouchableOpacity>
+          <TouchableOpacity style={playerModalStyles.closeAction} onPress={onClose}>
+            <Text style={playerModalStyles.closeActionText}>CLOSE</Text>
+          </TouchableOpacity>
+          <View style={playerModalStyles.bottomSpacer} />
+        </BottomSheetScrollView>
       </View>
     </AppBottomSheet>
   );
@@ -1154,9 +1289,19 @@ const fixtureStyles = StyleSheet.create({
 const modalStyles = StyleSheet.create({
   sheet: {
     flex: 1,
+    minHeight: 0,
     backgroundColor: Colors.surface,
     paddingHorizontal: 20,
-    paddingBottom: 24,
+  },
+  scroll: {
+    flex: 1,
+    minHeight: 0,
+  },
+  scrollContent: {
+    paddingTop: 8,
+  },
+  bottomSpacer: {
+    height: 96,
   },
   header: {
     flexDirection: 'row',
@@ -1225,6 +1370,19 @@ const modalStyles = StyleSheet.create({
     textAlign: 'center',
     padding: 24,
   },
+  cancelAction: {
+    marginTop: 12,
+    backgroundColor: Colors.primaryContainer,
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  cancelActionText: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: Colors.primary,
+    letterSpacing: 1,
+  },
   statSection: {
     marginBottom: 12,
   },
@@ -1251,6 +1409,7 @@ const modalStyles = StyleSheet.create({
 const playerModalStyles = StyleSheet.create({
   sheet: {
     flex: 1,
+    minHeight: 0,
     backgroundColor: Colors.surfaceContainer,
     overflow: 'hidden',
   },
@@ -1334,10 +1493,13 @@ const playerModalStyles = StyleSheet.create({
   tabIndicatorActive: {
     backgroundColor: Colors.primary,
   },
+  scroll: {
+    flex: 1,
+    minHeight: 0,
+  },
   scrollContent: {
     padding: 16,
     gap: 12,
-    paddingBottom: 24,
   },
   infoCard: {
     backgroundColor: Colors.primaryContainer + '55',
@@ -1361,6 +1523,57 @@ const playerModalStyles = StyleSheet.create({
     color: Colors.onSurfaceVariant,
     letterSpacing: 1.5,
     marginBottom: 10,
+  },
+  seasonTable: {
+    minWidth: 660,
+  },
+  seasonHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  seasonHeaderCell: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: Colors.outline,
+  },
+  seasonRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 6,
+  },
+  seasonCell: {
+    fontSize: 12,
+    color: Colors.onSurface,
+  },
+  seasonGw: {
+    width: 34,
+  },
+  seasonOpp: {
+    width: 86,
+    color: Colors.onSurfaceVariant,
+  },
+  seasonStat: {
+    width: 42,
+    textAlign: 'center',
+    color: Colors.onSurfaceVariant,
+  },
+  seasonMini: {
+    width: 32,
+    textAlign: 'center',
+    color: Colors.onSurfaceVariant,
+  },
+  seasonExpected: {
+    width: 48,
+    textAlign: 'center',
+    color: Colors.onSurfaceVariant,
+  },
+  seasonPoints: {
+    color: Colors.primary,
+    fontWeight: '800',
+  },
+  seasonFooterLabel: {
+    color: Colors.onSurface,
+    fontWeight: '800',
   },
   dataRow: {
     flexDirection: 'row',
@@ -1508,7 +1721,7 @@ const playerModalStyles = StyleSheet.create({
   },
   closeAction: {
     marginHorizontal: 16,
-    marginBottom: 16,
+    marginTop: 12,
     backgroundColor: Colors.primaryContainer,
     borderRadius: 12,
     paddingVertical: 14,
@@ -1519,6 +1732,9 @@ const playerModalStyles = StyleSheet.create({
     fontWeight: '800',
     color: Colors.primary,
     letterSpacing: 1,
+  },
+  bottomSpacer: {
+    height: 40,
   },
 });
 

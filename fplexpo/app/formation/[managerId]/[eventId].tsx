@@ -7,6 +7,7 @@ import {
   View, Text, TouchableOpacity, ActivityIndicator,
   StyleSheet, ScrollView,
 } from 'react-native';
+import { BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Api } from '@/services/api';
@@ -810,7 +811,8 @@ function PlayerDetailModal({
   selectedLeagueName: string | null;
   onClose: () => void;
 }) {
-  const [selectedTab, setSelectedTab] = useState<'summary' | 'starts' | 'bench'>('summary');
+  const insets = useSafeAreaInsets();
+  const [selectedTab, setSelectedTab] = useState<'summary' | 'starts' | 'bench' | 'season_log'>('summary');
   const [showAllPrevious, setShowAllPrevious] = useState(false);
   const [showAllUpcoming, setShowAllUpcoming] = useState(false);
 
@@ -851,6 +853,85 @@ function PlayerDetailModal({
   const displayMinutes = player.fixture && player.fixture.started === true && !player.fixture.finished
     ? player.fixture.minutes
     : (selectedHistory?.minutes ?? 0);
+  const seasonHistory = [...(detail?.history ?? [])].sort((a, b) => b.round - a.round);
+  const seasonTotals = seasonHistory.reduce((acc, row) => ({
+    totalPoints: acc.totalPoints + row.total_points,
+    minutes: acc.minutes + row.minutes,
+    goals: acc.goals + row.goals_scored,
+    assists: acc.assists + row.assists,
+    cleanSheets: acc.cleanSheets + row.clean_sheets,
+    defCon: acc.defCon + Number(row.defensive_contribution ?? 0),
+    xg: acc.xg + (Number.parseFloat(row.expected_goals ?? '0') || 0),
+    xa: acc.xa + (Number.parseFloat(row.expected_assists ?? '0') || 0),
+    xgc: acc.xgc + (Number.parseFloat(row.expected_goals_conceded ?? '0') || 0),
+  }), {
+    totalPoints: 0,
+    minutes: 0,
+    goals: 0,
+    assists: 0,
+    cleanSheets: 0,
+    defCon: 0,
+    xg: 0,
+    xa: 0,
+    xgc: 0,
+  });
+
+  const seasonLogContent = (
+    <DialogSection title="SEASON MATCH LOG">
+      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+        <View style={detailStyles.seasonTable}>
+          <View style={detailStyles.seasonHeaderRow}>
+            <Text style={[detailStyles.seasonHeaderCell, detailStyles.seasonGw]}>GW</Text>
+            <Text style={[detailStyles.seasonHeaderCell, detailStyles.seasonOpp]}>Opp</Text>
+            <Text style={[detailStyles.seasonHeaderCell, detailStyles.seasonStat]}>Min</Text>
+            <Text style={[detailStyles.seasonHeaderCell, detailStyles.seasonStat]}>Pts</Text>
+            <Text style={[detailStyles.seasonHeaderCell, detailStyles.seasonMini]}>G</Text>
+            <Text style={[detailStyles.seasonHeaderCell, detailStyles.seasonMini]}>A</Text>
+            <Text style={[detailStyles.seasonHeaderCell, detailStyles.seasonMini]}>C</Text>
+            <Text style={[detailStyles.seasonHeaderCell, detailStyles.seasonMini]}>DC</Text>
+            <Text style={[detailStyles.seasonHeaderCell, detailStyles.seasonExpected]}>xG</Text>
+            <Text style={[detailStyles.seasonHeaderCell, detailStyles.seasonExpected]}>xA</Text>
+            <Text style={[detailStyles.seasonHeaderCell, detailStyles.seasonExpected]}>xC</Text>
+          </View>
+          <View style={detailStyles.tableDivider} />
+          {seasonHistory.map((match) => {
+            const opponentTeam = bootstrapData.teams.find((entry) => entry.id === match.opponent_team);
+            return (
+              <View key={`${match.fixture}-${match.round}`} style={detailStyles.seasonRow}>
+                <Text style={[detailStyles.seasonCell, detailStyles.seasonGw]}>{match.round}</Text>
+                <Text style={[detailStyles.seasonCell, detailStyles.seasonOpp]}>
+                  {opponentTeam?.short_name ?? 'OPP'} {match.was_home ? '(H)' : '(A)'}
+                </Text>
+                <Text style={[detailStyles.seasonCell, detailStyles.seasonStat]}>{match.minutes > 0 ? match.minutes : '–'}</Text>
+                <Text style={[detailStyles.seasonCell, detailStyles.seasonStat, detailStyles.seasonPoints]}>{match.total_points}</Text>
+                <Text style={[detailStyles.seasonCell, detailStyles.seasonMini]}>{match.goals_scored}</Text>
+                <Text style={[detailStyles.seasonCell, detailStyles.seasonMini]}>{match.assists}</Text>
+                <Text style={[detailStyles.seasonCell, detailStyles.seasonMini]}>{match.clean_sheets}</Text>
+                <Text style={[detailStyles.seasonCell, detailStyles.seasonMini]}>{match.defensive_contribution ?? 0}</Text>
+                <Text style={[detailStyles.seasonCell, detailStyles.seasonExpected]}>{(Number.parseFloat(match.expected_goals ?? '0') || 0).toFixed(2)}</Text>
+                <Text style={[detailStyles.seasonCell, detailStyles.seasonExpected]}>{(Number.parseFloat(match.expected_assists ?? '0') || 0).toFixed(2)}</Text>
+                <Text style={[detailStyles.seasonCell, detailStyles.seasonExpected]}>{(Number.parseFloat(match.expected_goals_conceded ?? '0') || 0).toFixed(2)}</Text>
+              </View>
+            );
+          })}
+          <View style={detailStyles.tableDivider} />
+          <View style={detailStyles.seasonRow}>
+            <Text style={[detailStyles.seasonCell, detailStyles.seasonGw, detailStyles.seasonFooterLabel]}>Total</Text>
+            <Text style={[detailStyles.seasonCell, detailStyles.seasonOpp]}>Season</Text>
+            <Text style={[detailStyles.seasonCell, detailStyles.seasonStat]}>{seasonTotals.minutes}</Text>
+            <Text style={[detailStyles.seasonCell, detailStyles.seasonStat, detailStyles.seasonPoints]}>{seasonTotals.totalPoints}</Text>
+            <Text style={[detailStyles.seasonCell, detailStyles.seasonMini]}>{seasonTotals.goals}</Text>
+            <Text style={[detailStyles.seasonCell, detailStyles.seasonMini]}>{seasonTotals.assists}</Text>
+            <Text style={[detailStyles.seasonCell, detailStyles.seasonMini]}>{seasonTotals.cleanSheets}</Text>
+            <Text style={[detailStyles.seasonCell, detailStyles.seasonMini]}>{seasonTotals.defCon}</Text>
+            <Text style={[detailStyles.seasonCell, detailStyles.seasonExpected]}>{seasonTotals.xg.toFixed(2)}</Text>
+            <Text style={[detailStyles.seasonCell, detailStyles.seasonExpected]}>{seasonTotals.xa.toFixed(2)}</Text>
+            <Text style={[detailStyles.seasonCell, detailStyles.seasonExpected]}>{seasonTotals.xgc.toFixed(2)}</Text>
+          </View>
+        </View>
+      </ScrollView>
+    </DialogSection>
+  );
 
   const summaryContent = (() => {
     if (detail == null && isLoadingLeagueStats) {
@@ -1111,7 +1192,7 @@ function PlayerDetailModal({
   })();
 
   return (
-    <AppBottomSheet visible onClose={onClose} snapPoints={['92%']}>
+    <AppBottomSheet visible onClose={onClose} snapPoints={['97%']}>
       <View style={detailStyles.sheet}>
         <View style={detailStyles.header}>
           <View style={[detailStyles.teamBadge, { backgroundColor: getTeamBadgeColor(team?.id) }]}>
@@ -1145,20 +1226,26 @@ function PlayerDetailModal({
             selected={selectedTab === 'bench'}
             onPress={() => setSelectedTab('bench')}
           />
+          <DialogTabButton
+            label="Season Log"
+            selected={selectedTab === 'season_log'}
+            onPress={() => setSelectedTab('season_log')}
+          />
         </View>
 
-        <ScrollView
+        <BottomSheetScrollView
+          style={detailStyles.scroll}
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={detailStyles.scrollContent}
+          contentContainerStyle={[detailStyles.scrollContent, { paddingBottom: insets.bottom + 24 }]}
         >
           {selectedTab === 'summary' && summaryContent}
           {selectedTab === 'starts' && startsContent}
           {selectedTab === 'bench' && benchContent}
-        </ScrollView>
-
-        <TouchableOpacity style={detailStyles.closeAction} onPress={onClose} activeOpacity={0.9}>
-          <Text style={detailStyles.closeActionText}>CLOSE</Text>
-        </TouchableOpacity>
+          {selectedTab === 'season_log' && seasonLogContent}
+          <TouchableOpacity style={detailStyles.closeAction} onPress={onClose} activeOpacity={0.9}>
+            <Text style={detailStyles.closeActionText}>CLOSE</Text>
+          </TouchableOpacity>
+        </BottomSheetScrollView>
       </View>
     </AppBottomSheet>
   );
@@ -1256,6 +1343,7 @@ const listStyles = StyleSheet.create({
 const detailStyles = StyleSheet.create({
   sheet: {
     flex: 1,
+    minHeight: 0,
     backgroundColor: Colors.surfaceContainer,
     overflow: 'hidden',
   },
@@ -1340,10 +1428,13 @@ const detailStyles = StyleSheet.create({
   tabIndicatorActive: {
     backgroundColor: Colors.primary,
   },
+  scroll: {
+    flex: 1,
+    minHeight: 0,
+  },
   scrollContent: {
     padding: 16,
     gap: 12,
-    paddingBottom: 24,
   },
   loadingBlock: {
     marginTop: 24,
@@ -1498,6 +1589,57 @@ const detailStyles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '800',
   },
+  seasonTable: {
+    minWidth: 660,
+  },
+  seasonHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  seasonHeaderCell: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: Colors.outline,
+  },
+  seasonRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 6,
+  },
+  seasonCell: {
+    fontSize: 12,
+    color: Colors.onSurface,
+  },
+  seasonGw: {
+    width: 34,
+  },
+  seasonOpp: {
+    width: 86,
+    color: Colors.onSurfaceVariant,
+  },
+  seasonStat: {
+    width: 42,
+    textAlign: 'center',
+    color: Colors.onSurfaceVariant,
+  },
+  seasonMini: {
+    width: 32,
+    textAlign: 'center',
+    color: Colors.onSurfaceVariant,
+  },
+  seasonExpected: {
+    width: 48,
+    textAlign: 'center',
+    color: Colors.onSurfaceVariant,
+  },
+  seasonPoints: {
+    color: Colors.primary,
+    fontWeight: '800',
+  },
+  seasonFooterLabel: {
+    color: Colors.onSurface,
+    fontWeight: '800',
+  },
   expandButton: {
     marginTop: 10,
     alignSelf: 'flex-start',
@@ -1610,7 +1752,7 @@ const detailStyles = StyleSheet.create({
   },
   closeAction: {
     marginHorizontal: 16,
-    marginBottom: 16,
+    marginTop: 12,
     backgroundColor: Colors.primaryContainer,
     borderRadius: 12,
     paddingVertical: 14,
@@ -1622,6 +1764,9 @@ const detailStyles = StyleSheet.create({
     fontWeight: '800',
     color: Colors.primary,
     letterSpacing: 1,
+  },
+  bottomSpacer: {
+    height: 0,
   },
 });
 

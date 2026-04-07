@@ -44,6 +44,10 @@ export interface Player {
   status: string;
   news?: string;
   photo: string;
+  goals_scored?: number;
+  assists?: number;
+  clean_sheets?: number;
+  cost_change_start?: number;
 }
 
 export interface ElementType {
@@ -315,6 +319,53 @@ export interface BackendLeaguePlayerStats {
   managers_count?: number;
 }
 
+export interface StatsOverviewResponse {
+  meta: StatsOverviewMeta;
+  sections: {
+    mostPoints: StatsLeaderboardSection;
+    gameweekPoints: StatsLeaderboardSection & { isLive?: boolean };
+    goals: StatsLeaderboardSection;
+    assists: StatsLeaderboardSection;
+    marketRisers: StatsLeaderboardSection;
+    marketFallers: StatsLeaderboardSection;
+    form?: StatsLeaderboardSection;
+    ownership?: StatsLeaderboardSection;
+  };
+  defCon: {
+    DEF: StatsLeaderboardSection;
+    MID: StatsLeaderboardSection;
+    FWD: StatsLeaderboardSection;
+  };
+}
+
+export interface StatsOverviewMeta {
+  event: number;
+  eventName: string;
+  isLive: boolean;
+  currentEvent: number;
+}
+
+export interface StatsLeaderboardSection {
+  title: string;
+  statLabel: string;
+  rows: StatsLeaderboardPlayer[];
+}
+
+export interface StatsLeaderboardPlayer {
+  playerId: number;
+  name: string;
+  teamId: number;
+  teamShortName: string;
+  position: string;
+  primaryValue: number;
+  primaryDisplay: string;
+  secondaryDisplay?: string;
+  currentPrice?: number;
+  liveDelta?: number;
+  priceDelta?: number;
+  bestActions?: number;
+}
+
 // ── Player Detail ─────────────────────────────────────────────────────────────
 export interface PlayerDetailResponse {
   fixtures: PlayerFixture[];
@@ -363,10 +414,14 @@ export interface PlayerHistory {
   bonus: number;
   bps: number;
   value: number;
+  defensive_contribution?: number;
   transfers_balance: number;
   selected: number;
   transfers_in: number;
   transfers_out: number;
+  expected_goals?: string;
+  expected_assists?: string;
+  expected_goals_conceded?: string;
 }
 
 export interface PlayerHistoryPast {

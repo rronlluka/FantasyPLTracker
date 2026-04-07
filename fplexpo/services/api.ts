@@ -15,6 +15,7 @@ import {
   ManagerTransfer,
   BackendHealthResponse,
   BackendLeaguePlayerStats,
+  StatsOverviewResponse,
 } from '../types/fpl';
 
 // ── Backend URL (updated at runtime via Settings screen) ──────────────────────
@@ -93,6 +94,10 @@ export const Api = {
   // Player detail
   getPlayerDetail: (elementId: number): Promise<PlayerDetailResponse> =>
     request<PlayerDetailResponse>(`element-summary/${elementId}/`),
+
+  // Stats overview
+  getStatsOverview: (eventId?: number): Promise<StatsOverviewResponse> =>
+    request<StatsOverviewResponse>(`stats/overview${eventId != null ? `?event=${eventId}` : ''}`),
 
   // Backend-only: pre-computed league player stats
   getLeaguePlayerStats: (

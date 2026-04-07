@@ -7,12 +7,12 @@ import {
   ActivityIndicator,
   FlatList,
   RefreshControl,
-  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -579,7 +579,11 @@ export default function LeagueStandingsScreen() {
               </Text>
             </TouchableOpacity>
 
-            <ScrollView style={styles.modalList} showsVerticalScrollIndicator={false}>
+            <BottomSheetScrollView
+              style={styles.modalList}
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={{ paddingBottom: insets.bottom + 8 }}
+            >
               {[...availableGameweeks].reverse().map((gw) => {
                 if (gw === currentEvent) return null;
                 const active = selectedGameweek === gw;
@@ -598,7 +602,7 @@ export default function LeagueStandingsScreen() {
                   </TouchableOpacity>
                 );
               })}
-            </ScrollView>
+            </BottomSheetScrollView>
           </View>
         </View>
       </AppBottomSheet>
@@ -1055,7 +1059,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.06)',
   },
   modalList: {
-    maxHeight: 320,
+    flex: 1,
   },
   modalItem: {
     paddingHorizontal: 18,
