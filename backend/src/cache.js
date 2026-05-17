@@ -8,17 +8,17 @@ const { recordCacheHit } = require('./metrics');
 // ── TTL values (seconds) ──────────────────────────────────────────────────────
 
 const TTL = {
-  BOOTSTRAP:        5  * 60,   // 5 min  — teams/players don't change often
-  FIXTURES:         5  * 60,   // 5 min
-  LIVE_ACTIVE:      60,        // 1 min  — during an active gameweek with live games
+  BOOTSTRAP:        2  * 60,   // 2 min  — event_points on players updates live
+  FIXTURES:         90,        // 90 sec — game status (started/finished) must be fresh
+  LIVE_ACTIVE:      45,        // 45 sec — live stats during active GW
   LIVE_IDLE:        5  * 60,   // 5 min  — between gameweeks
   STATS_ACTIVE:     2  * 60 * 60,   // 2 hr   — while the selected/current GW is live
   STATS_IDLE:       24 * 60 * 60,   // 24 hr  — for finished/non-live GWs
   LEAGUE_STANDINGS: 2  * 60,   // 2 min
-  PLAYER_DETAIL:    10 * 60,   // 10 min — historical stats, rarely changes
+  PLAYER_DETAIL:    3  * 60,   // 3 min  — bps/bonus update during live games
   MANAGER_DATA:     5  * 60,
   MANAGER_HISTORY:  5  * 60,
-  MANAGER_PICKS:    60 * 60,   // 1 hr   — picks lock at deadline, won't change mid-GW
+  MANAGER_PICKS:    3  * 60,   // 3 min  — entry_history.points updates as games settle
   MANAGER_TRANSFERS:5  * 60,
 };
 

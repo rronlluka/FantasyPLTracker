@@ -245,33 +245,36 @@ export default function FormationScreen() {
   const liveMap = new Map(liveData?.elements.map((e) => [e.id, e]) ?? []);
   const playerMap = new Map<number, Player>(bootstrapData.elements.map((p) => [p.id, p]));
   const teamMap = new Map<number, Team>(bootstrapData.teams.map((t) => [t.id, t]));
-  const hasLiveFixtures = fixtures.some(
-    (fixture) => fixture.started === true && fixture.finished === false && fixture.finished_provisional === false,
-  );
+
+  // A fixture is "truly in progress" only while the match clock is running below 90 min.
+  // FPL can lag minutes after the final whistle before flipping finished:true,
+  // so minutes >= 90 is treated as "effectively finished" for bucketing purposes.
+  // FPL can lag several minutes before flipping finished:true after the final whistle,
+  // so we use minutes >= 90 as the "effectively finished" signal.
+  const isTrulyInProgress = (f: Fixture) =>
+    f.started === true && f.finished === false && f.minutes < 90;
 
   const makePlayerWithDetails = (pickItem: (typeof picks.picks)[0]): PlayerWithDetails | null => {
     const player = playerMap.get(pickItem.element);
     if (!player) return null;
     const liveEl = liveMap.get(pickItem.element);
     const team = teamMap.get(player.team);
-    const fixture = fixtures.find((item) => item.team_h === player.team || item.team_a === player.team);
-    const isLiveFixture =
-      fixture?.started === true &&
-      fixture.finished === false &&
-      fixture.finished_provisional === false;
-    const hasFinishedFixtureWithLiveStats =
-      fixture?.finished === true &&
-      liveEl != null;
+    const playerFixtures = fixtures.filter(
+      (item) => item.team_h === player.team || item.team_a === player.team,
+    );
+    const fixture = playerFixtures[0];
+    // True live: at least one fixture has clock still running (< 90 min)
+    const playerIsLive = playerFixtures.some(isTrulyInProgress);
+    const hasStarted = playerFixtures.some((f) => f.started === true);
+    const hasFinishedFixtureWithLiveStats = hasStarted && !playerIsLive && liveEl != null;
     const hasSettledGwPoints = playerGwPoints.has(pickItem.element);
     const settledGwPoints = playerGwPoints.get(pickItem.element);
-    const currentPoints = isLiveFixture && liveEl
+    const currentPoints = (playerIsLive || hasFinishedFixtureWithLiveStats) && liveEl
       ? liveEl.stats.total_points
-      : hasFinishedFixtureWithLiveStats
-        ? liveEl.stats.total_points
-        : hasSettledGwPoints
-          ? (settledGwPoints ?? 0)
-          : (liveEl?.stats.total_points ?? player.event_points);
-    const liveDeltaPoints = isLiveFixture && liveEl ? liveEl.stats.total_points : 0;
+      : hasSettledGwPoints
+        ? (settledGwPoints ?? 0)
+        : (liveEl?.stats.total_points ?? player.event_points);
+    const liveDeltaPoints = playerIsLive && liveEl ? liveEl.stats.total_points : 0;
     const displayPoints = currentPoints * (pickItem.position > 11 ? 1 : pickItem.multiplier);
 
     return {
@@ -284,6 +287,7 @@ export default function FormationScreen() {
       teamInfo: team,
       fixture,
       liveStats: liveEl,
+      isLive: playerIsLive,
     };
   };
 
@@ -298,10 +302,36 @@ export default function FormationScreen() {
     .map(makePlayerWithDetails)
     .filter((p): p is PlayerWithDetails => p !== null);
 
-  const totalLive = startingXI.reduce(
-    (sum, p) => sum + p.liveDeltaPoints * p.pick.multiplier,
-    0,
-  );
+  // In-progress: use the isLive flag already computed per-player in makePlayerWithDetails.
+  const inProgressPoints = startingXI.reduce((sum, p) => {
+    if (p.isLive && p.liveStats != null) {
+      return sum + p.liveStats.stats.total_points * p.pick.multiplier;
+    }
+    return sum;
+  }, 0);
+
+  // Finished games: player has started a fixture but is no longer in-progress.
+  // Ignore finished_provisional — fixtures cache (90s) can flip it before the picks
+  // cache (3 min) refreshes entry_history.points, losing points from both buckets.
+  const finishedGameLivePoints = startingXI.reduce((sum, p) => {
+    const pFixtures = fixtures.filter(
+      (f) => f.team_h === p.player.team || f.team_a === p.player.team,
+    );
+    const hasStarted = pFixtures.some((f) => f.started === true);
+    if (hasStarted && !p.isLive && p.liveStats != null) {
+      return sum + p.liveStats.stats.total_points * p.pick.multiplier;
+    }
+    return sum;
+  }, 0);
+
+  // Base finished-game points: whichever is higher — FPL settled or live finished data.
+  const baseGwPoints = Math.max(picks.entry_history.points, finishedGameLivePoints);
+  // Live chip = only truly in-progress games (clock still running).
+  const totalLive = inProgressPoints;
+  // GW Pts = everything accumulated so far: finished (settled/unsettled) + in-progress.
+  const gwPtsRunning = baseGwPoints + inProgressPoints;
+  // Total Score = all-time base + everything not yet reflected in entry_history.
+  const totalScoreRunning = picks.entry_history.total_points + (gwPtsRunning - picks.entry_history.points);
   const benchPoints = picks.entry_history.points_on_bench;
   const transferHit = picks.entry_history.event_transfers_cost;
   const totalScore = picks.entry_history.total_points;
@@ -375,9 +405,9 @@ export default function FormationScreen() {
 
       {/* Score summary */}
       <View style={styles.scoreRow}>
-        <ScoreChip label="GW Pts" value={String(picks.entry_history.points)} />
-        <ScoreChip label="Total Score" value={String(totalScore)} />
-        <ScoreChip label="Live" value={String(hasLiveFixtures ? totalLive : 0)} highlight />
+        <ScoreChip label="GW Pts" value={String(gwPtsRunning)} />
+        <ScoreChip label="Total Score" value={String(totalScoreRunning)} />
+        <ScoreChip label="Live" value={String(totalLive)} highlight />
         <ScoreChip label="On Bench" value={String(benchPoints)} />
       </View>
 
@@ -642,7 +672,8 @@ function ListSection({
           <Text style={listStyles.name} numberOfLines={1}>{p.player.web_name}</Text>
           {p.pick.is_captain && <Text style={listStyles.captainBadge}>C</Text>}
           {p.pick.is_vice_captain && <Text style={listStyles.vcBadge}>V</Text>}
-          <Text style={listStyles.points}>{p.displayPoints}</Text>
+          {p.isLive && <View style={listStyles.liveDot} />}
+          <Text style={[listStyles.points, p.isLive && listStyles.pointsLive]}>{p.displayPoints}</Text>
         </TouchableOpacity>
       ))}
     </View>
@@ -853,6 +884,21 @@ function PlayerDetailModal({
   const displayMinutes = player.fixture && player.fixture.started === true && !player.fixture.finished
     ? player.fixture.minutes
     : (selectedHistory?.minutes ?? 0);
+  // Game has started but FPL hasn't finalized (provisional) the result yet.
+  // Use live stats for bps/bonus/total_points since history endpoint lags behind.
+  const isGameUnsettled =
+    player.fixture != null &&
+    player.fixture.started === true &&
+    player.fixture.finished_provisional === false;
+  const displayBps = isGameUnsettled && player.liveStats != null
+    ? (player.liveStats.stats.bps ?? 0)
+    : (selectedHistory?.bps ?? 0);
+  const displayBonus = isGameUnsettled && player.liveStats != null
+    ? (player.liveStats.stats.bonus ?? 0)
+    : (selectedHistory?.bonus ?? 0);
+  const displayTotalPoints = isGameUnsettled && player.liveStats != null
+    ? player.liveStats.stats.total_points
+    : (selectedHistory?.total_points ?? 0);
   const seasonHistory = [...(detail?.history ?? [])].sort((a, b) => b.round - a.round);
   const seasonTotals = seasonHistory.reduce((acc, row) => ({
     totalPoints: acc.totalPoints + row.total_points,
@@ -994,9 +1040,9 @@ function PlayerDetailModal({
               label={`Played ${displayMinutes} min:`}
               value={String(displayMinutes === 0 ? 0 : displayMinutes >= 60 ? 2 : 1)}
             />
-            <SummaryPointRow label={`Bonus (${selectedHistory.bps} bps):`} value={String(selectedHistory.bonus)} />
+            <SummaryPointRow label={`Bonus (${displayBps} bps):`} value={String(displayBonus)} />
             <View style={detailStyles.divider} />
-            <SummaryPointRow label="Total Points:" value={String(selectedHistory.total_points)} emphasize />
+            <SummaryPointRow label="Total Points:" value={String(displayTotalPoints)} emphasize />
           </DialogSection>
         )}
 
@@ -1337,6 +1383,16 @@ const listStyles = StyleSheet.create({
     color: Colors.primary,
     minWidth: 30,
     textAlign: 'right',
+  },
+  pointsLive: {
+    color: Colors.secondary,
+  },
+  liveDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    backgroundColor: Colors.primary,
+    marginRight: 4,
   },
 });
 

@@ -42,6 +42,7 @@ type ManagerLeagueMeta = {
   inPlay: number;
   toStart: number;
   livePoints: number;
+  finishedGameLivePoints: number;
 };
 
 function formatTotal(value: number): string {
@@ -206,6 +207,7 @@ export default function LeagueStandingsScreen() {
           let inPlay = 0;
           let toStart = 0;
           let livePoints = 0;
+          let finishedGameLivePoints = 0;
 
           if (!isHistorical && picks) {
             const scoringPicks = picks.picks.filter((pick) =>
@@ -216,17 +218,21 @@ export default function LeagueStandingsScreen() {
               const player = bootstrap.elements.find((element) => element.id === pick.element);
               if (!player) return;
 
-              const fixture = currentFixtures.find(
+              // Use filter (not find) so DGW players with two fixtures are handled correctly.
+              const playerFixtures = currentFixtures.filter(
                 (item) => item.team_h === player.team || item.team_a === player.team,
               );
-              if (!fixture) return;
+              if (playerFixtures.length === 0) return;
 
-              const isLiveFixture =
-                fixture.started === true &&
-                fixture.finished === false &&
-                fixture.finished_provisional === false;
+              // A player is "in progress" only while the clock is still running (< 90 min).
+              // FPL can lag minutes before flipping finished:true after the final whistle,
+              // so minutes >= 90 is treated as effectively finished even if finished:false.
+              const hasInProgress = playerFixtures.some(
+                (f) => f.started === true && f.finished === false && f.minutes < 90,
+              );
+              const hasStarted = playerFixtures.some((f) => f.started === true);
 
-              if (isLiveFixture) {
+              if (hasInProgress) {
                 inPlay += 1;
                 const liveElement = liveElementMap.get(pick.element);
                 if (liveElement) {
@@ -235,9 +241,18 @@ export default function LeagueStandingsScreen() {
                 return;
               }
 
-              if (fixture.started !== true) {
-                toStart += 1;
+              // All started fixtures are done (officially finished or clock >= 90) —
+              // collect live points for the finished bucket regardless of
+              // finished_provisional to bridge the fixtures/picks cache-lag window.
+              if (hasStarted) {
+                const liveElement = liveElementMap.get(pick.element);
+                if (liveElement) {
+                  finishedGameLivePoints += liveElement.stats.total_points * pick.multiplier;
+                }
+                return;
               }
+
+              toStart += 1;
             });
           }
 
@@ -252,6 +267,7 @@ export default function LeagueStandingsScreen() {
               inPlay,
               toStart,
               livePoints,
+              finishedGameLivePoints,
             } satisfies ManagerLeagueMeta,
           };
         }),
@@ -328,7 +344,7 @@ export default function LeagueStandingsScreen() {
   const entries = displayEntries;
   const hasLiveFixtures = useMemo(
     () => fixtures.some((fixture) =>
-      fixture.started === true && fixture.finished === false && fixture.finished_provisional === false,
+      fixture.started === true && fixture.finished === false && fixture.minutes < 90,
     ),
     [fixtures],
   );
@@ -493,10 +509,14 @@ export default function LeagueStandingsScreen() {
           renderItem={({ item }) => {
             const meta = managerMetaMap.get(item.entry);
             const livePoints = hasLiveFixtures ? (meta?.livePoints ?? 0) : 0;
+            const finishedGameLivePoints = meta?.finishedGameLivePoints ?? 0;
             const chip = meta?.activeChip ?? null;
             const captainName = meta?.captainName ?? null;
             const isUserTeam = item.entry === currentManagerId;
-            const gwDisplayValue = item.event_total + livePoints;
+            // Math.max bridges the cache-lag window between fixtures (90s TTL) and
+            // picks (3 min TTL): once FPL settles event_total it wins; before that,
+            // live finished-game data fills the gap.
+            const gwDisplayValue = Math.max(item.event_total, finishedGameLivePoints) + livePoints;
 
             return (
               <TouchableOpacity

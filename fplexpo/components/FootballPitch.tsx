@@ -35,6 +35,7 @@ export interface PlayerWithDetails {
   teamInfo?: Team;
   fixture?: Fixture;
   liveStats?: LiveElement;
+  isLive?: boolean;
 }
 
 function getTeamColor(teamId: number): string {
@@ -144,17 +145,21 @@ function StarterPlayerCard({
   const teamColor = getTeamColor(player.player.team);
   const displayPoints = player.displayPoints;
   const isCaptain = player.pick.is_captain;
+  const isLive = player.isLive === true;
 
   return (
     <TouchableOpacity
-      style={playerStyles.card}
+      style={[playerStyles.card, isLive && playerStyles.cardLive]}
       onPress={() => onPress?.(player)}
       activeOpacity={0.8}
     >
-      {/* Team colour top stripe */}
-      <View style={[playerStyles.stripe, { backgroundColor: teamColor }]} />
+      {/* Team colour top stripe — green when live so the full border is visible */}
+      <View style={[playerStyles.stripe, { backgroundColor: isLive ? Colors.primary : teamColor }]} />
 
       <PlayerIndicators player={player} />
+
+      {/* Live dot — top-left corner */}
+      {isLive && <View style={playerStyles.liveDot} />}
 
       {/* Web name */}
       <Text style={playerStyles.name} numberOfLines={1}>
@@ -186,15 +191,18 @@ function BenchPlayerCard({
   onPress?: (p: PlayerWithDetails) => void;
 }) {
   const teamColor = getTeamColor(player.player.team);
+  const isLive = player.isLive === true;
 
   return (
     <TouchableOpacity
-      style={[playerStyles.card, playerStyles.benchCard]}
+      style={[playerStyles.card, playerStyles.benchCard, isLive && playerStyles.cardLive]}
       onPress={() => onPress?.(player)}
       activeOpacity={0.8}
     >
-      <View style={[playerStyles.stripe, { backgroundColor: teamColor }]} />
+      <View style={[playerStyles.stripe, { backgroundColor: isLive ? Colors.primary : teamColor }]} />
       <PlayerIndicators player={player} />
+
+      {isLive && <View style={playerStyles.liveDot} />}
 
       <Text style={playerStyles.name} numberOfLines={1}>
         {player.player.web_name}
@@ -309,6 +317,20 @@ const playerStyles = StyleSheet.create({
   },
   benchCard: {
     opacity: 0.9,
+  },
+  cardLive: {
+    borderColor: Colors.primary,
+    borderWidth: 1.5,
+  },
+  liveDot: {
+    position: 'absolute',
+    top: 6,
+    left: 6,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: Colors.primary,
+    zIndex: 3,
   },
   stripe: {
     width: '100%',
